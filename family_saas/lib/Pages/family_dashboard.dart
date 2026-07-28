@@ -20,6 +20,9 @@ class _FamilyPageState extends State<FamilyPage> {
 
     return Scaffold(
 
+      //TODO: Create header titled Family Dashboard
+      //TODO: Add icon for users to create new families
+      //TODO: Have new families populate with link attached to image
       appBar: AppBar(
         title: const Text("Family Dashboard"),
       ),
