@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../Services/auth_service.dart';
 
+//TODO: Add Name
+//TODO: Add Phone Number
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});

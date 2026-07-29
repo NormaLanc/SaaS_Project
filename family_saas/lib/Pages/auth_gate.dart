@@ -12,19 +12,27 @@ class AuthGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
 
-    final session =
-        Supabase.instance.client.auth.currentSession;
+    return StreamBuilder<AuthState>(
+      stream: Supabase.instance.client.auth.onAuthStateChange,
+
+      builder: (context, snapshot) {
+
+        final session =
+            snapshot.data?.session;
 
 
-    if (session != null) {
+        if (session != null) {
 
-      return const FamilyPage();
+          return const FamilyPage();
 
-    } else {
+        } else {
 
-      return const SignInPage();
+          return const SignInPage();
 
-    }
+        }
+
+      },
+    );
 
   }
 }

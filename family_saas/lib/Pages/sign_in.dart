@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../Services/auth_service.dart';
+import '../Pages/create_account.dart';
 
 
 class SignInPage extends StatefulWidget {
@@ -87,7 +88,24 @@ class _SignInPageState extends State<SignInPage> {
             ElevatedButton(
               onPressed: register,
               child: const Text("Login"),
-            )
+            ),
+
+            //The registration button
+            TextButton(
+              onPressed: () {
+
+              Navigator.push(
+                context,
+              MaterialPageRoute(
+               builder: (context) => const RegisterPage(),
+              ),
+            );
+
+          },
+          child: const Text(
+            "Create an account",
+          ),
+        ),
 
           ],
         ),

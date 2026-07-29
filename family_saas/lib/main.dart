@@ -9,7 +9,7 @@ Future<void> main() async {
 
   await Supabase.initialize(
     //URL to the database
-    url: 'https://ednrgrcrhqvrjiukthzd.supabase.co/rest/v1/',
+    url: 'https://ednrgrcrhqvrjiukthzd.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkbnJncmNyaHF2cmppdWt0aHpkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUxODg4NjksImV4cCI6MjEwMDc2NDg2OX0.V0prLDH4IL3znllgO2cHLzBZtq6H7xh_q5ZjS6FvT-0',
   );
 
