@@ -17,8 +17,29 @@ class AuthService {
 
   }
 
+  Future<void> createProfile({
+    required String userId,
+    required String firstName,
+    required String lastName,
+    required String phoneNumber,
+  }) async {
+
+    await supabase
+        .from('profiles')
+        .insert({
+
+      'user_id': userId,
+      'first_name': firstName,
+      'last_name': lastName,
+      'phone_number': phoneNumber,
+
+    });
+
+  }
+
 
   Future<AuthResponse> signIn(
+
       String email,
       String password,
   ) async {
