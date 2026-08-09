@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 //import '../Services/auth_service.dart';
 
 
-class FamilyPage extends StatefulWidget {
-  const FamilyPage({super.key});
+class FamilyDashboard extends StatefulWidget {
+  const FamilyDashboard({super.key});
 
 
   @override
-  State<FamilyPage> createState() => _FamilyPageState();
+  State<FamilyDashboard> createState() => _FamilyDashboardState();
 }
 
 
-class _FamilyPageState extends State<FamilyPage> {
+class _FamilyDashboardState extends State<FamilyDashboard> {
 
   
 

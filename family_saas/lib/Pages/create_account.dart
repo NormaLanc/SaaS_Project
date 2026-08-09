@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../Services/auth_service.dart';
 
-
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
 
@@ -13,47 +12,83 @@ class RegisterPage extends StatefulWidget {
 
 class _RegisterPageState extends State<RegisterPage> {
 
+  final firstNameController = TextEditingController();
+  final lastNameController = TextEditingController();
+  final phoneController = TextEditingController();
+
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
   final authService = AuthService();
 
-
-  void register() async {
+void register() async {
 
     try {
 
-      await authService.signUp(
+      final response = await authService.signUp(
         emailController.text.trim(),
         passwordController.text.trim(),
       );
 
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Account created!"),
-        ),
-      );
+      final user = response.user;
 
 
-    } catch(e){
+      if (user != null) {
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-        ),
-      );
+        await authService.createProfile(
+          userId: user.id,
+          firstName: firstNameController.text.trim(),
+          lastName: lastNameController.text.trim(),
+          phoneNumber: phoneController.text.trim(),
+        );
 
+      }
+
+
+      print("Registration successful");
+
+
+    } catch(e) {
+
+      print(e);
     }
-
   }
+  // void register() async {
+
+  //   try {
+
+  //     await authService.signUp(
+  //       emailController.text.trim(),
+  //       passwordController.text.trim(),
+  //     );
+
+
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(
+  //         content: Text("Account created!"),
+  //       ),
+  //     );
+
+
+  //   } catch(e){
+
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(
+  //         content: Text(e.toString()),
+  //       ),
+  //     );
+
+  //   }
+
+  // }
 
 
   @override
   Widget build(BuildContext context){
 
     return Scaffold(
-
+    //TODO: Update UI for this page.
       appBar: AppBar(
         title: const Text("Create Family Account"),
       ),
@@ -66,6 +101,28 @@ class _RegisterPageState extends State<RegisterPage> {
         child: Column(
 
           children: [
+
+            TextField(
+              controller: firstNameController,
+              decoration: const InputDecoration(
+              labelText: "First Name",
+            ),
+          ),
+
+            TextField(
+              controller: lastNameController,
+              decoration: const InputDecoration(
+              labelText: "Last Name",
+            ),
+          ),
+
+            TextField(
+              controller: phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+              labelText: "Phone Number",
+            ),
+          ),
 
             TextField(
               controller: emailController,
