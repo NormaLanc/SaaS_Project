@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'Pages/auth_gate.dart';
 import 'Router/app_router.dart';
 
 
