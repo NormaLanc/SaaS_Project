@@ -53,7 +53,7 @@ class _DesktopLandingPageState extends State<DesktopLandingPage> {
 
     try {
       await Supabase.instance.client
-          .from('waitlist')
+          .from('Waitlist')
           .insert({
         'email': email,
       });
@@ -67,10 +67,13 @@ class _DesktopLandingPageState extends State<DesktopLandingPage> {
 
       _emailController.clear();
     } catch (error) {
-      if (!mounted) return;
+      //TODO: delete this once error is fixed!
+      // print('WAITLIST ERROR: $error');
+      // if (!mounted) return;
 
       setState(() {
         _isSubmitting = false;
+        //_errorMessage = error.toString();
         _errorMessage =
             'Something went wrong. Please try again.';
       });
