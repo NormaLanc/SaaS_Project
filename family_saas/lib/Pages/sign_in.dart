@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../Services/auth_service.dart';
 import '../Pages/create_account.dart';
+import '../Pages/App/family_dashboard.dart';
 
 
 class SignInPage extends StatefulWidget {
@@ -20,24 +21,32 @@ class _SignInPageState extends State<SignInPage> {
   final authService = AuthService();
 
 
-  void register() async {
+  void login() async {
 
     try {
 
       await authService.signIn(
-        emailController.text,
-        passwordController.text,
+        emailController.text.trim(),
+        passwordController.text.trim(),
       );
 
+      if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Account created!"),
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const FamilyDashboard(),
         ),
       );
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   const SnackBar(
+      //     content: Text("Account created!"),
+      //   ),
+      // );
 
 
     } catch(e){
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -84,13 +93,13 @@ class _SignInPageState extends State<SignInPage> {
               ),
             ),
 
-
+            //Login button
             ElevatedButton(
-              onPressed: register,
+              onPressed: login,
               child: const Text("Login"),
             ),
 
-            //The registration button
+            //Create an account button
             TextButton(
               onPressed: () {
 
