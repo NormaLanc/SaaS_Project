@@ -7,7 +7,8 @@ import '../Pages/sign_in.dart';
 import '../Pages/create_account.dart';
 import '../Pages/family_dashboard.dart';
 import '../Pages/App/family_dashboard.dart';
-
+import '../Pages/App/settings.dart';
+import '../Pages/App/profile_page.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: kIsWeb ? '/' : '/app',
@@ -55,6 +56,14 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/app',
       builder: (context, state) => const FamilyDashboard(),
+    ),
+    GoRoute(
+      path: '/settings',
+      builder: (context, state) => const SettingsPage(),
+    ),
+    GoRoute(
+      path: '/profile',
+      builder: (context, state) => const ProfilePage(),
     ),
   ],
 );
