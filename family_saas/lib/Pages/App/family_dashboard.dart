@@ -14,16 +14,57 @@ class FamilyDashboard extends StatefulWidget {
 
 class _FamilyDashboardState extends State<FamilyDashboard> {
 
-  
+//Dialog box to ask the user if they want to join an existing family or create a new one
+  void showFamilyOptions() {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text("Add a Family"),
+
+          content: const Text(
+            "Would you like to join an existing family or create a new one?",
+          ),
+
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+
+                context.go('/join-family');
+              },
+              child: const Text("Join Existing Family"),
+            ),
+
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+
+                context.go('/create-family');
+              },
+              child: const Text("Create New Family"),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context){
 
     return Scaffold(
 
-      //TODO: Add icon for users to create new families
+      
       appBar: AppBar(
         title: const Text("Family Dashboard"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: "Add Family",
+            onPressed: showFamilyOptions,
+          ),
+        ],
       ),
       drawer: Drawer(
         child: ListView(
@@ -90,6 +131,7 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
         ),
       ),
 
+      
       body: const Center(
         child: Text('Family Dashboard'),
       ),
