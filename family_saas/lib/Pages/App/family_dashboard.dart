@@ -31,7 +31,7 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
               onPressed: () {
                 Navigator.pop(dialogContext);
 
-                context.go('/join-family');
+                context.push('/join-family');
               },
               child: const Text("Join Existing Family"),
             ),
@@ -40,7 +40,7 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
               onPressed: () {
                 Navigator.pop(dialogContext);
 
-                context.go('/create-family');
+                context.push('/create-family');
               },
               child: const Text("Create New Family"),
             ),
