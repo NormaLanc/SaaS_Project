@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 //The details to send invites will be on this page.
+//TODO: Link to Invites Page
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});

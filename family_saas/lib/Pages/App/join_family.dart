@@ -7,7 +7,6 @@
 //TODO: Only the owner can manage members and approve/reject new members or change permissions
 //TODO: Temporary permissions for family members can be set by the owner (future feature)
 
-
 import 'package:flutter/material.dart';
 
 class JoinFamilyPage extends StatefulWidget {
@@ -18,6 +17,7 @@ class JoinFamilyPage extends StatefulWidget {
 }
 
 class _JoinFamilyPageState extends State<JoinFamilyPage> {
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
