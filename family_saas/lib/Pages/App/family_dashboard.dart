@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 //import '../Services/auth_service.dart';
 
 
@@ -13,6 +14,50 @@ class FamilyDashboard extends StatefulWidget {
 
 
 class _FamilyDashboardState extends State<FamilyDashboard> {
+
+  bool isLoading = true;
+  bool hasApprovedFamily = false;
+
+  @override
+  void initState() {
+    super.initState();
+    checkFamilyMembership();
+  }
+
+  Future<void> checkFamilyMembership() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+
+      if (user == null) {
+        return;
+      }
+
+      final response = await Supabase.instance.client
+          .from('Family_Members')
+          .select()
+          .eq('user_id', user.id)
+          .eq('status', 'approved');
+
+      if (!mounted) return;
+
+      setState(() {
+        hasApprovedFamily = response.isNotEmpty;
+        isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading families: $e'),
+        ),
+      );
+    }
+  }
 
 //Dialog box to ask the user if they want to join an existing family or create a new one
   void showFamilyOptions() {
@@ -132,9 +177,19 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
       ),
 
       
-      body: const Center(
-        child: Text('Family Dashboard'),
-      ),
+      body: isLoading
+        ? const Center(
+          child: CircularProgressIndicator(),
+        )
+      : hasApprovedFamily
+          ? const Center(
+              child: Text("Family Dashboard Content"),
+            )
+          : const Center(
+              child: Text(
+                "Create a family or join an existing family to get started.",
+              ),
+            ),
     );
   }
 }

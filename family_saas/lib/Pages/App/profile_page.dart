@@ -1,3 +1,6 @@
+//TODO: Allow user to select profile picture
+//TODO: Allow user to edit profile information (name, email, password)
+
 import 'package:flutter/material.dart';
 
 class ProfilePage extends StatefulWidget {
