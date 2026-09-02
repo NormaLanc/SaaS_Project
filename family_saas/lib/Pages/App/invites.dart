@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+//import 'package:go_router/go_router.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class InvitesPage extends StatefulWidget {
@@ -89,9 +90,9 @@ Future<void> loadFamilies() async {
   try {
     final response = await supabase
         .from('Families')
-        .select('id, name')
+        .select('id, family_name')
         .eq('created_by', user.id)
-        .order('name');
+        .order('family_name');
 
     if (!mounted) return;
 
@@ -192,7 +193,7 @@ Future<void> loadFamilies() async {
           'can_edit_calendar': canEditCalendar,
           'can_manage_schedule': canManageSchedule,
           'can_manage_members': canManageMembers,
-          'can_view_children': canViewChildren,
+          'can_view_child': canViewChildren,
           'can_post': canPost,
 
           'expires_at': expiresAt.toIso8601String(),
@@ -235,9 +236,376 @@ Future<void> loadFamilies() async {
       appBar: AppBar(
         title: const Text("Invite a family member."),
       ),
-      body: const Center(
-        //child: Text("Join Family Page"),
+      body: SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+
+          children: [
+            const Text(
+              "Create an Invitation",
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            const Text(
+              "Choose a family, role, and permissions for the person you want to invite.",
+            ),
+
+            const SizedBox(height: 30),
+
+            // =========================
+            // FAMILY DROPDOWN
+            // =========================
+
+            const Text(
+              "Family",
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            if (isLoadingFamilies)
+              const Center(
+                child: CircularProgressIndicator(),
+              )
+            else if (families.isEmpty)
+              const Text(
+                "You have not created any families yet.",
+              )
+            else
+              DropdownButtonFormField<String>(
+                value: selectedFamilyId,
+
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                ),
+
+                items: families.map((family) {
+                  return DropdownMenuItem<String>(
+                    value: family['id'].toString(),
+
+                    child: Text(
+                      family['family_name']?.toString() ??
+                          "Unnamed Family",
+                    ),
+                  );
+                }).toList(),
+
+                onChanged: (value) {
+                  setState(() {
+                    selectedFamilyId = value;
+                  });
+                },
+              ),
+
+            const SizedBox(height: 28),
+
+            // =========================
+            // ROLE DROPDOWN
+            // =========================
+
+            const Text(
+              "Role",
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            DropdownButtonFormField<String>(
+              value: selectedRole,
+
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+              ),
+
+              items: roles.map((role) {
+                return DropdownMenuItem<String>(
+                  value: role,
+                  child: Text(role),
+                );
+              }).toList(),
+
+              onChanged: (value) {
+                if (value == null) return;
+
+                setState(() {
+                  selectedRole = value;
+                });
+              },
+            ),
+
+            const SizedBox(height: 30),
+
+            // =========================
+            // PERMISSIONS
+            // =========================
+
+            const Text(
+              "Permissions",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 6),
+
+            const Text(
+              "Choose what this person will be allowed to access.",
+            ),
+
+            const SizedBox(height: 10),
+
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("View Photos"),
+              value: canViewPhotos,
+              onChanged: (value) {
+                setState(() {
+                  canViewPhotos = value ?? false;
+                });
+              },
+            ),
+
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("Upload Photos"),
+              value: canUploadPhotos,
+              onChanged: (value) {
+                setState(() {
+                  canUploadPhotos = value ?? false;
+                });
+              },
+            ),
+
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("View Calendar"),
+              value: canViewCalendar,
+              onChanged: (value) {
+                setState(() {
+                  canViewCalendar = value ?? false;
+                });
+              },
+            ),
+
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("Edit Calendar"),
+              value: canEditCalendar,
+              onChanged: (value) {
+                setState(() {
+                  canEditCalendar = value ?? false;
+                });
+              },
+            ),
+
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("View Documents"),
+              value: canViewDocuments,
+              onChanged: (value) {
+                setState(() {
+                  canViewDocuments = value ?? false;
+                });
+              },
+            ),
+
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("Manage Schedule"),
+              value: canManageSchedule,
+              onChanged: (value) {
+                setState(() {
+                  canManageSchedule = value ?? false;
+                });
+              },
+            ),
+
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("Manage Members"),
+              value: canManageMembers,
+              onChanged: (value) {
+                setState(() {
+                  canManageMembers = value ?? false;
+                });
+              },
+            ),
+
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("View Children"),
+              value: canViewChildren,
+              onChanged: (value) {
+                setState(() {
+                  canViewChildren = value ?? false;
+                });
+              },
+            ),
+
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("Create Posts"),
+              value: canPost,
+              onChanged: (value) {
+                setState(() {
+                  canPost = value ?? false;
+                });
+              },
+            ),
+
+            const SizedBox(height: 30),
+
+            // =========================
+            // GENERATE BUTTON
+            // =========================
+
+            SizedBox(
+              width: double.infinity,
+
+              child: ElevatedButton(
+                onPressed:
+                    isGeneratingInvite || families.isEmpty
+                        ? null
+                        : createInvite,
+
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 14,
+                  ),
+
+                  child: isGeneratingInvite
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          "Generate Invite Code",
+                        ),
+                ),
+              ),
+            ),
+
+            // =========================
+            // GENERATED CODE
+            // =========================
+
+            if (generatedCode != null) ...[
+              const SizedBox(height: 35),
+
+              const Divider(),
+
+              const SizedBox(height: 20),
+
+              const Text(
+                "Invite Code",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              const Text(
+                "Send this code privately to the person you want to invite.",
+              ),
+
+              const SizedBox(height: 18),
+
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Colors.grey,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+
+                child: Column(
+                  children: [
+                    SelectableText(
+                      generatedCode!,
+                      textAlign: TextAlign.center,
+
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2,
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    const Text(
+                      "Expires in 24 hours",
+                    ),
+
+                    const Text(
+                      "Can only be used once",
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              SizedBox(
+                width: double.infinity,
+
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(
+                      ClipboardData(
+                        text: generatedCode!,
+                      ),
+                    );
+
+                    if (!mounted) return;
+
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          "Invite code copied!",
+                        ),
+                      ),
+                    );
+                  },
+
+                  icon: const Icon(
+                    Icons.copy,
+                  ),
+
+                  label: const Text(
+                    "Copy Invite Code",
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
+    ),
     );
   }
 }
