@@ -15,9 +15,39 @@ class _InvitesPageState extends State<InvitesPage> {
 
   final supabase = Supabase.instance.client;
 
+  // -----------------------
+  // FAMILY DATA
+  // -----------------------
+  List<Map<String, dynamic>> families = [];
+
+  bool isLoadingFamilies = true;
+
+
   // These will eventually come from your UI
   String? selectedFamilyId;
-  String selectedRole = 'member';
+
+  // ------------------------
+  // ROLE
+  // ------------------------
+
+  String selectedRole = 'Parent';
+
+  final List<String> roles = [
+    'Parent',
+    'Grandparent',
+    'Sibling',
+    'Aunt',
+    'Uncle',
+    'Cousin',
+    'Guardian',
+    'Caregiver',
+    'Extended Family',
+    'Other',
+  ];
+
+  // -----------------------
+  // PERMISSIONS
+  // -----------------------
 
   bool canViewPhotos = true;
   bool canUploadPhotos = false;
@@ -29,6 +59,69 @@ class _InvitesPageState extends State<InvitesPage> {
   bool canViewChildren = true;
   bool canPost = false;
 
+// -----------------------
+// INVITE
+// -----------------------
+  String? generatedCode;
+  bool isGeneratingInvite = false;
+
+  //INIT
+  @override
+void initState() {
+  super.initState();
+
+  loadFamilies();
+}
+
+Future<void> loadFamilies() async {
+  final user = supabase.auth.currentUser;
+
+  if (user == null) {
+    if (mounted) {
+      setState(() {
+        isLoadingFamilies = false;
+      });
+    }
+
+    return;
+  }
+
+  try {
+    final response = await supabase
+        .from('Families')
+        .select('id, name')
+        .eq('created_by', user.id)
+        .order('name');
+
+    if (!mounted) return;
+
+    setState(() {
+      families =
+          List<Map<String, dynamic>>.from(response);
+
+      if (families.isNotEmpty) {
+        selectedFamilyId =
+            families.first['id'].toString();
+      }
+
+      isLoadingFamilies = false;
+    });
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() {
+      isLoadingFamilies = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          "Unable to load families: $e",
+        ),
+      ),
+    );
+  }
+}
 
   // Generates the random one-time code
   String generateInviteCode() {
@@ -45,7 +138,9 @@ class _InvitesPageState extends State<InvitesPage> {
     return '${generatePart(4)}-${generatePart(4)}-${generatePart(4)}';
   }
 
-
+//==========================
+//CREATE INVITE
+//==========================
   // Runs when owner presses "Generate Invite"
   Future<void> createInvite() async {
 
@@ -65,7 +160,11 @@ class _InvitesPageState extends State<InvitesPage> {
       return;
     }
 
+     setState(() {
+    isGeneratingInvite = true;
+    });
 
+  try{
     // Generate one-time code
     final code = generateInviteCode();
 
@@ -77,12 +176,12 @@ class _InvitesPageState extends State<InvitesPage> {
 
 
     // Save invitation to Supabase
-    await Supabase.instance.client
+    await supabase
         .from('Family_Invitations')
         .insert({
           'family_id': selectedFamilyId,
-          'used_by': user.id,
-          'code_hash': code,
+          'created_by': user.id,
+          'invite_code': code,
 
           'role': selectedRole,
 
@@ -91,6 +190,8 @@ class _InvitesPageState extends State<InvitesPage> {
           'can_view_calendar': canViewCalendar,
           'can_view_documents': canViewDocuments,
           'can_edit_calendar': canEditCalendar,
+          'can_manage_schedule': canManageSchedule,
+          'can_manage_members': canManageMembers,
           'can_view_children': canViewChildren,
           'can_post': canPost,
 
@@ -100,56 +201,35 @@ class _InvitesPageState extends State<InvitesPage> {
 
     if (!mounted) return;
 
+    setState(() {
+      generatedCode = code;
+    });
 
-    // Show the generated code to the owner
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Invite Created"),
-
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                "Give this one-time invite code to the family member:",
-              ),
-
-              const SizedBox(height: 20),
-
-              SelectableText(
-                code,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              const Text(
-                "This code expires in 24 hours and can only be used once.",
-              ),
-            ],
-          ),
-
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-
-              child: const Text("Done"),
-            ),
-          ],
-        );
-      },
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          "Invite created successfully!",
+        ),
+      ),
     );
+
+  }catch(e){
+    if(!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Unable to create invite: $e"),
+      ),
+    );
+  } finally {
+    if(mounted) {
+      setState(() {
+        isGeneratingInvite = false;
+      });
+    }
   }
-
-
-
-  @override
+}
+    
+@override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -161,3 +241,4 @@ class _InvitesPageState extends State<InvitesPage> {
     );
   }
 }
+
