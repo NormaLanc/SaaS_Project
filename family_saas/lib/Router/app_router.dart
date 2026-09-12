@@ -6,12 +6,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../Pages/landing_page.dart';
 import '../Pages/sign_in.dart';
 import '../Pages/create_account.dart';
-import '../Pages/family_dashboard.dart';
 import '../Pages/App/family_dashboard.dart';
 import '../Pages/App/settings.dart';
 import '../Pages/App/profile_page.dart';
 import '../Pages/App/join_family.dart';
 import '../Pages/App/create_family.dart';
+import '../Pages/App/family_page.dart';
+import '../Pages/App/add_child_page.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: kIsWeb ? '/' : '/app',
@@ -53,10 +54,6 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => const RegisterPage(),
     ),
     GoRoute(
-      path: '/family-setup',
-      builder: (context, state) => const FamilyPage(),
-    ),
-    GoRoute(
       path: '/app',
       builder: (context, state) => const FamilyDashboard(),
     ),
@@ -80,5 +77,27 @@ final GoRouter appRouter = GoRouter(
       path: '/invitations',
       builder: (context, state) => const InvitesPage(),
     ),
+    GoRoute(
+  path: '/family/:familyId',
+  builder: (context, state) {
+    final familyId =
+        state.pathParameters['familyId']!;
+
+    return FamilyPage(
+      familyId: familyId,
+    );
+  },
+),
+GoRoute(
+  path: '/family/:familyId/add-children',
+  builder: (context, state) {
+    final familyId =
+        state.pathParameters['familyId']!;
+
+    return AddChildrenPage(
+      familyId: familyId,
+    );
+  },
+),
   ],
 );

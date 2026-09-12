@@ -18,46 +18,100 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
   bool isLoading = true;
   bool hasApprovedFamily = false;
 
+  final supabase = Supabase.instance.client;
+
+  List<Map<String, dynamic>> families = [];
+
+  String? selectedFamilyId;
+
   @override
   void initState() {
     super.initState();
     checkFamilyMembership();
   }
 
-  Future<void> checkFamilyMembership() async {
-    try {
-      final user = Supabase.instance.client.auth.currentUser;
+Future<void> checkFamilyMembership() async {
+  try {
+    final user = supabase.auth.currentUser;
 
-      if (user == null) {
-        return;
+    if (user == null) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
       }
 
-      final response = await Supabase.instance.client
-          .from('Family_Members')
-          .select()
-          .eq('user_id', user.id)
-          .eq('status', 'approved');
-
-      if (!mounted) return;
-
-      setState(() {
-        hasApprovedFamily = response.isNotEmpty;
-        isLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        isLoading = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error loading families: $e'),
-        ),
-      );
+      return;
     }
+
+    // Get all approved family memberships for this user.
+    final membershipResponse = await supabase
+        .from('Family_Members')
+        .select('family_id')
+        .eq('user_id', user.id)
+        .eq('status', 'approved');
+
+    final memberships =
+        List<Map<String, dynamic>>.from(membershipResponse);
+
+    // If user does not belong to any approved families.
+    if (memberships.isEmpty) {
+      if (!mounted) return;
+
+      setState(() {
+        hasApprovedFamily = false;
+        families = [];
+        selectedFamilyId = null;
+        isLoading = false;
+      });
+
+      return;
+    }
+
+    // Get all of the family IDs.
+    final familyIds = memberships
+        .map((membership) => membership['family_id'])
+        .where((id) => id != null)
+        .toList();
+
+    // Load the actual family records.
+    final familyResponse = await supabase
+        .from('Families')
+        .select('id, family_name')
+        .inFilter('id', familyIds)
+        .order('family_name');
+
+    if (!mounted) return;
+
+    setState(() {
+      families =
+          List<Map<String, dynamic>>.from(familyResponse);
+
+      hasApprovedFamily = families.isNotEmpty;
+
+      if (families.isNotEmpty) {
+        selectedFamilyId =
+            families.first['id'].toString();
+      }
+
+      isLoading = false;
+    });
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Error loading families: $e',
+        ),
+      ),
+    );
   }
+}
 
 //Dialog box to ask the user if they want to join an existing family or create a new one
   void showFamilyOptions() {
@@ -121,6 +175,51 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
               ),
               child: Text('Menu'),
             ),
+            if (families.isNotEmpty)
+  Padding(
+    padding: const EdgeInsets.fromLTRB(
+      16,
+      16,
+      16,
+      8,
+    ),
+    child: DropdownButtonFormField<String>(
+      value: selectedFamilyId,
+
+      decoration: const InputDecoration(
+        labelText: "Family",
+        prefixIcon: Icon(Icons.family_restroom),
+        border: OutlineInputBorder(),
+      ),
+
+      items: families.map((family) {
+        return DropdownMenuItem<String>(
+          value: family['id'].toString(),
+
+          child: Text(
+            family['family_name']?.toString() ??
+                "Unnamed Family",
+          ),
+        );
+      }).toList(),
+
+      onChanged: (familyId) {
+        if (familyId == null) return;
+
+        setState(() {
+          selectedFamilyId = familyId;
+        });
+
+        // Close the menu.
+        Navigator.pop(context);
+
+        // Open the selected family's page.
+        context.push(
+          '/family/$familyId',
+        );
+      },
+    ),
+  ),
             ListTile(
               leading: const Icon(Icons.home),
               title: const Text('Home'),
@@ -166,10 +265,13 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
               },
             ),
             ListTile(
+              leading: const Icon(Icons.settings),
               title: const Text('Settings'),
               onTap: () {
+                //Close the drawer before navigating to the settings page
+                Navigator.pop(context);
                 // Navigate to the settings page
-                context.go('/settings');
+                context.push('/settings');
               },
             ),
           ],

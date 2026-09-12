@@ -15,7 +15,14 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: "Back to Family Dashboard",
+          onPressed: () {
+            context.go('/app');
+          },
+        ),
+        title: const Text("Settings"),
       ),
 
       //Invite new family members using one-time invite codes
