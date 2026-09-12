@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 //The details to send invites will be on this page.
-//TODO: Generate one-time invite codes for inviting new family members
-//TODO: Invite permissions are tied to unique one-time invite codes
-//TODO: Family role is tied to unique one-time invite codes
+//TODO: Link to Invites Page
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -22,13 +21,32 @@ class _SettingsPageState extends State<SettingsPage> {
       //Invite new family members using one-time invite codes
      
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Text('Settings Page'),
-            // Add your settings options here
-          ],
-        ),
+        child: ListTile(
+          leading: const Icon(Icons.mail_outline),
+
+          title: const Text(
+            'Invitations',
+          ),
+
+          subtitle: const Text(
+            'Create and manage family invitations',
+          ),
+
+          trailing: const Icon(
+            Icons.chevron_right,
+          ),
+
+          onTap: () {
+          context.push('/invitations');
+          },
+),//Column(
+          
+          // mainAxisAlignment: MainAxisAlignment.center,
+          // children: const [
+          //   Text('Settings Page'),
+          //   // Add your settings options here
+          // ],
+       // ),
       ),
     );
   }

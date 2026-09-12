@@ -7,8 +7,9 @@
 //TODO: Only the owner can manage members and approve/reject new members or change permissions
 //TODO: Temporary permissions for family members can be set by the owner (future feature)
 
-
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class JoinFamilyPage extends StatefulWidget {
   const JoinFamilyPage({super.key});
@@ -18,14 +19,192 @@ class JoinFamilyPage extends StatefulWidget {
 }
 
 class _JoinFamilyPageState extends State<JoinFamilyPage> {
+
+  final inviteCodeController = TextEditingController();
+
+  final supabase = Supabase.instance.client;
+
+  bool isLoading = false;
+
+  Future<void> submitInviteCode() async {
+    final user = supabase.auth.currentUser;
+
+    if (user == null) {
+      return;
+    }
+
+    final code = inviteCodeController.text
+        .trim()
+        .toUpperCase();
+
+    if (code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please enter your invite code."),
+        ),
+      );
+
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final invite = await supabase
+          .from('Family_Invitations')
+          .select()
+          .eq('code_hash', code)
+          .maybeSingle();
+
+      if (invite == null) {
+        throw Exception("Invalid invite code.");
+      }
+
+      // Has it already been used?
+      if (invite['used_at'] != null) {
+        throw Exception(
+          "This invite code has already been used.",
+        );
+      }
+
+      // Is it expired?
+      final expiresAt =
+          DateTime.parse(invite['expires_at']);
+
+      if (DateTime.now().toUtc().isAfter(expiresAt)) {
+        throw Exception(
+          "This invite code has expired.",
+        );
+      }
+
+      final familyId = invite['family_id'];
+
+      // Create pending membership
+      await supabase
+          .from('Family_Members')
+          .insert({
+            'family_id': familyId,
+            'user_id': user.id,
+            'role': invite['role'],
+            'status': 'pending',
+          });
+
+      // Mark invite as used
+      await supabase
+          .from('Family_Invites')
+          .update({
+            'used_at':
+                DateTime.now().toUtc().toIso8601String(),
+
+            'used_by': user.id,
+          })
+          .eq('id', invite['id']);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Request sent! The family owner must approve your access.",
+          ),
+        ),
+      );
+
+      context.go('/app');
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    inviteCodeController.dispose();
+    super.dispose();
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Join Family"),
       ),
-      body: const Center(
-        child: Text("Join Family Page"),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+
+          children: [
+            const Text(
+              "Join a Family",
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            const Text(
+              "Enter the one-time invitation code you received from the family owner.",
+            ),
+
+            const SizedBox(height: 30),
+
+            TextField(
+              controller: inviteCodeController,
+
+              textCapitalization:
+                  TextCapitalization.characters,
+
+              decoration: const InputDecoration(
+                labelText: "Invite Code",
+                hintText: "XXXX-XXXX-XXXX",
+                border: OutlineInputBorder(),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            SizedBox(
+              width: double.infinity,
+
+              child: ElevatedButton(
+                onPressed:
+                    isLoading ? null : submitInviteCode,
+
+                child: isLoading
+                    ? const CircularProgressIndicator()
+                    : const Text(
+                        "Request to Join",
+                      ),
+              ),
+            ),
+
+            TextButton(
+              onPressed: () {
+                context.pop();
+              },
+
+              child: const Text("Cancel"),
+            ),
+          ],
+        ),
       ),
     );
   }

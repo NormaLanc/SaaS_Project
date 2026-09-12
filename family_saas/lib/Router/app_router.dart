@@ -1,3 +1,4 @@
+import 'package:family_saas/Pages/App/invites.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -74,6 +75,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/create-family',
       builder: (context, state) => const CreateFamilyPage(),
+    ),
+    GoRoute(
+      path: '/invitations',
+      builder: (context, state) => const InvitesPage(),
     ),
   ],
 );
