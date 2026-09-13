@@ -125,6 +125,10 @@ class _AddChildrenPageState
   Future<void> saveChildren() async {
     final user = supabase.auth.currentUser;
 
+    debugPrint("========== ADD CHILD DEBUG ==========");
+    debugPrint("Logged in user: ${user?.id}");
+    debugPrint("Family being used: ${widget.familyId}");
+
     if (user == null) {
       return;
     }
@@ -165,6 +169,15 @@ class _AddChildrenPageState
 
     try {
       for (final child in children) {
+
+        final familyDebug = await supabase
+    .from('Families')
+    .select('id, created_by')
+    .eq('id', widget.familyId)
+    .single();
+
+    debugPrint("Family row: $familyDebug");
+    debugPrint("=====================================");
 
         final createdChild =
             await supabase

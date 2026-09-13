@@ -133,6 +133,32 @@ class _FamilyPageState extends State<FamilyPage> {
 
             const SizedBox(height: 30),
 
+                const Text(
+                  "Calendar",
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+          const SizedBox(height: 12),
+            Card(
+              child: ListTile(
+                leading:
+                  const Icon(
+                Icons.calendar_month,
+              ),
+                title: const Text('Family Calendar',),
+                subtitle: const Text('Schedules, birthdays, sports, and events',),
+                trailing: const Icon(Icons.chevron_right,),
+
+                onTap: () {
+                  context.push(
+                    '/family/${widget.familyId}/calendar',
+                  );
+                },
+              ),
+            ),
             Row(
               mainAxisAlignment:
                   MainAxisAlignment.spaceBetween,
@@ -156,7 +182,6 @@ class _FamilyPageState extends State<FamilyPage> {
                 ),
               ],
             ),
-
             const SizedBox(height: 12),
 
             if (children.isEmpty)
@@ -258,8 +283,9 @@ class _FamilyPageState extends State<FamilyPage> {
                       ),
 
                       onTap: () {
-                        // We will connect this
-                        // to ChildProfilePage next.
+                         context.push(
+                          '/child/${child['id']}',
+                        );
                       },
                     ),
                   );

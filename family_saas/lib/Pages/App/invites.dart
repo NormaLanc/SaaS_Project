@@ -284,7 +284,7 @@ Future<void> loadFamilies() async {
               )
             else
               DropdownButtonFormField<String>(
-                value: selectedFamilyId,
+                initialValue: selectedFamilyId,
 
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
@@ -325,7 +325,7 @@ Future<void> loadFamilies() async {
             const SizedBox(height: 8),
 
             DropdownButtonFormField<String>(
-              value: selectedRole,
+              initialValue: selectedRole,
 
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),

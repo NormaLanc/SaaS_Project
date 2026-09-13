@@ -13,6 +13,11 @@ import '../Pages/App/join_family.dart';
 import '../Pages/App/create_family.dart';
 import '../Pages/App/family_page.dart';
 import '../Pages/App/add_child_page.dart';
+import '../Pages/App/child_profile.dart';
+import '../Pages/App/Milestones/add_milestones.dart';
+import '../Pages/App/Photos/add_photo.dart';
+import '../Pages/App/Calendar/family_calendar.dart';
+import '../Pages/App/Calendar/add_event.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: kIsWeb ? '/' : '/app',
@@ -96,6 +101,78 @@ GoRoute(
 
     return AddChildrenPage(
       familyId: familyId,
+    );
+  },
+),
+GoRoute(
+  path: '/child/:childId',
+  builder: (context, state) {
+    final childId =
+        state.pathParameters['childId']!;
+
+    return ChildProfilePage(
+      childId: childId,
+    );
+  },
+),
+GoRoute(
+  path:
+      '/family/:familyId/child/:childId/add-milestone',
+  builder: (context, state) {
+    final familyId =
+        state.pathParameters[
+            'familyId']!;
+
+    final childId =
+        state.pathParameters[
+            'childId']!;
+
+    return AddMilestonePage(
+      familyId: familyId,
+      childId: childId,
+    );
+  },
+),
+GoRoute(
+  path:
+      '/family/:familyId/child/:childId/add-photo',
+  builder: (context, state) {
+    final familyId =
+        state.pathParameters[
+            'familyId']!;
+
+    final childId =
+        state.pathParameters[
+            'childId']!;
+
+    return AddPhotoPage(
+      familyId: familyId,
+      childId: childId,
+    );
+  },
+),
+GoRoute(
+  path: '/family/:familyId/calendar',
+  builder: (context, state) {
+    final familyId =
+        state.pathParameters[
+            'familyId']!;
+
+    return FamilyCalendarPage(
+      familyId: familyId,
+    );
+  },
+),
+GoRoute(
+  path:
+      '/family/:familyId/calendar/add-event',
+  builder: (context, state) {
+    final familyId =
+        state.pathParameters['familyId']!;
+
+    return AddEventPage(
+      familyId:
+          familyId,
     );
   },
 ),
