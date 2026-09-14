@@ -39,7 +39,7 @@ class _FamilyPageState extends State<FamilyPage> {
 
       final familyResponse = await supabase
           .from('Families')
-          .select('id, family_name')
+          .select('id, family_name, created_by')
           .eq('id', widget.familyId)
           .single();
 
@@ -85,6 +85,91 @@ class _FamilyPageState extends State<FamilyPage> {
     }
   }
 
+  Future<bool> confirmDelete({
+    required String title,
+    required String message,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child: const Text(
+                'Cancel',
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+            },
+              child: const Text(
+                'Delete',
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  Future<void> deleteFamily() async {
+  final shouldDelete =
+      await confirmDelete(
+    title: 'Delete Family',
+    message:
+        'Deleting this family will permanently remove the family and its related children, milestones, events, documents, and photos. This cannot be undone.',
+  );
+
+  if (!shouldDelete) return;
+
+  try {
+    await supabase
+        .from('Families')
+        .delete()
+        .eq(
+          'id',
+          widget.familyId,
+        );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Family deleted.',
+        ),
+      ),
+    );
+
+    context.go('/app');
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(
+          'Unable to delete family: $e',
+        ),
+      ),
+    );
+  }
+}
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -110,9 +195,42 @@ class _FamilyPageState extends State<FamilyPage> {
         family!['family_name']?.toString() ??
             "Family";
 
+    final currentUser = supabase.auth.currentUser;
+
+    final isFamilyOwner =
+      currentUser != null &&
+      family!['created_by']
+            ?.toString() ==
+        currentUser.id;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(familyName),
+
+        actions: [
+          if (isFamilyOwner)
+            PopupMenuButton<String>(
+              onSelected: (value) {
+              if (value == 'delete-family') {
+                deleteFamily();
+              }
+            },
+
+      itemBuilder: (context) => [
+        const PopupMenuItem<String>(
+          value: 'delete-family',
+
+          child: Row(
+            children: [
+              Icon(Icons.delete_forever,),
+              SizedBox(width: 8,),
+              Text('Delete Family',),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
 
       body: SingleChildScrollView(

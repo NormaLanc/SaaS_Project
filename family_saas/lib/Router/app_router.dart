@@ -18,13 +18,19 @@ import '../Pages/App/Milestones/add_milestones.dart';
 import '../Pages/App/Photos/add_photo.dart';
 import '../Pages/App/Calendar/family_calendar.dart';
 import '../Pages/App/Calendar/add_event.dart';
+import '../Pages/App/Documents/add_document.dart';
+import '../Pages/App/Notifications/notifications.dart';
 
 final GoRouter appRouter = GoRouter(
-  initialLocation: kIsWeb ? '/' : '/app',
+  initialLocation: kIsWeb ? '/' : '/login',
 
   redirect: (context, state) {
     final session = Supabase.instance.client.auth.currentSession;
     final isLoggedIn = session != null;
+
+    debugPrint('ROUTER SESSION: ${session?.user.id}',);
+
+    debugPrint('ROUTER PATH: ${state.uri.path}',);
 
     final path = state.uri.path;
 
@@ -66,6 +72,10 @@ final GoRouter appRouter = GoRouter(
       path: '/settings',
       builder: (context, state) => const SettingsPage(),
     ),
+    GoRoute(
+      path: '/notifications',
+      builder: (context, state) => const NotificationsPage(),
+),
     GoRoute(
       path: '/profile',
       builder: (context, state) => const ProfilePage(),
@@ -173,6 +183,27 @@ GoRoute(
     return AddEventPage(
       familyId:
           familyId,
+    );
+  },
+),
+GoRoute(
+  path:
+      '/family/:familyId/child/:childId/add-document',
+
+  builder: (context, state) {
+    final familyId =
+        state.pathParameters[
+            'familyId']!;
+
+    final childId =
+        state.pathParameters[
+            'childId']!;
+
+    return AddDocumentPage(
+      familyId:
+          familyId,
+      childId:
+          childId,
     );
   },
 ),

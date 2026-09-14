@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../Services/auth_service.dart';
+import 'package:go_router/go_router.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -46,12 +47,32 @@ void register() async {
       }
 
 
-      print("Registration successful");
+      if (!mounted) return;
+
+ScaffoldMessenger.of(context).showSnackBar(
+  const SnackBar(
+    content: Text(
+      "Account Successfully Created!",
+    ),
+  ),
+);
+    await authService.signOut();
+    context.go('/login');
 
 
     } catch(e) {
 
-      print(e);
+      debugPrint('REGISTRATION ERROR: $e');
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Unable to create account: $e',
+        ),
+      ),
+    );
     }
   }
   // void register() async {

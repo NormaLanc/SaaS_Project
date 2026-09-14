@@ -187,6 +187,47 @@ class _AddPhotoPageState
     super.dispose();
   }
 
+  Future<bool> confirmDelete({
+  required String title,
+  required String message,
+}) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(
+                dialogContext,
+                false,
+              );
+            },
+            child: const Text(
+              'Cancel',
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(
+                dialogContext,
+                true,
+              );
+            },
+            child: const Text(
+              'Delete',
+            ),
+          ),
+        ],
+      );
+    },
+  );
+
+  return result ?? false;
+}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

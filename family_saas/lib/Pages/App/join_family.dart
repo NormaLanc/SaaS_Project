@@ -1,10 +1,7 @@
-//TODO: Implement one-time code field for joining a family
-//TODO: Owner is sent a notification to approve the new member
+
+
 //TODO: Once approved, the new member is added to the family and can access the family dashboard
 //TODO: If the owner rejects the request, the new member is notified and cannot access the family dashboard
-//TODO: If the owner does not respond within a certain time frame, the request is automatically rejected and the new member is notified
-//TODO: Permission levels for family members: view photos, edit child information, view documents, manage schedule, manage members
-//TODO: Only the owner can manage members and approve/reject new members or change permissions
 //TODO: Temporary permissions for family members can be set by the owner (future feature)
 
 import 'package:flutter/material.dart';
@@ -52,11 +49,35 @@ class _JoinFamilyPageState extends State<JoinFamilyPage> {
     });
 
     try {
-      final invite = await supabase
-          .from('Family_Invitations')
-          .select()
-          .eq('code_hash', code)
-          .maybeSingle();
+      // final invite = await supabase
+      //     .from('Family_Invitations')
+      //     .select()
+      //     .eq('invite_code', code)
+      //     .maybeSingle();
+      final enteredCode =
+    inviteCodeController.text
+        .trim()
+        .toUpperCase();
+
+
+final invite = await supabase
+    .from('Family_Invitations')
+    .select()
+    .eq(
+      'invite_code',
+      enteredCode,
+    )
+    //  .gt(
+    //   'expires_at',
+    //   DateTime.now()
+    //       .toUtc()
+    //       .toIso8601String(),
+    // )
+    .maybeSingle();
+
+//TODO: Delete when no longer needed
+    debugPrint('ENTERED INVITE CODE: $enteredCode');
+    debugPrint('INVITE RESULT: $invite');
 
       if (invite == null) {
         throw Exception("Invalid invite code.");
@@ -79,21 +100,83 @@ class _JoinFamilyPageState extends State<JoinFamilyPage> {
         );
       }
 
-      final familyId = invite['family_id'];
+      //final familyId = invite['family_id'];
 
       // Create pending membership
+    final membership = await supabase
+    .from('Family_Members')
+    .insert({
+      'family_id': invite['family_id'],
+      'user_id': supabase.auth.currentUser!.id,
+      'role': invite['role'],
+      'status': 'pending',
+      'approved_by': null,
+
+      'can_view_photos': invite['can_view_photos'] ?? false,
+      'can_upload_photos': invite['can_upload_photos'] ?? false,
+
+      'can_view_calendar': invite['can_view_calendar'] ?? false,
+      'can_edit_calendar': invite['can_edit_calendar'] ?? false,
+
+      'can_view_children': invite['can_view_children'] ?? false,
+      'can_post': invite['can_post'] ?? false,
+})
+    .select()
+    .single();
+
+
+    final family = await supabase
+    .from('Families')
+    .select(
+      'id, family_name, created_by',
+    )
+    .eq(
+      'id',
+      invite['family_id'],
+    )
+    .single();
+
+    final familyOwnerId = family['created_by'];
+
+    final requesterProfile =
       await supabase
-          .from('Family_Members')
-          .insert({
-            'family_id': familyId,
-            'user_id': user.id,
-            'role': invite['role'],
-            'status': 'pending',
-          });
+        .from('Profiles')
+        .select(
+          'first_name, last_name',
+        )
+        .eq(
+          'user_id',
+          user.id,
+        )
+        .maybeSingle();
+
+    final firstName = requesterProfile?['first_name']
+            ?.toString() ??
+            '';
+
+    final lastName = requesterProfile?['last_name']
+            ?.toString() ??
+            '';
+    
+    await supabase
+    .from('Notifications')
+    .insert({
+      'recipient_user_id': familyOwnerId,
+      'requested_user_id': user.id,
+      'family_id': invite['family_id'],
+      'membership_id': membership['id'],
+      'type': 'family_join_request',
+      'title': 'Family Access Request',
+      'message': '$firstName $lastName has requested access to family "${family['family_name']}".',
+      'status': 'active',
+      'is_read': false,
+      'action_required': true,
+      'action_status': 'pending',
+    });
 
       // Mark invite as used
       await supabase
-          .from('Family_Invites')
+          .from('Family_Invitations')
           .update({
             'used_at':
                 DateTime.now().toUtc().toIso8601String(),
@@ -114,6 +197,7 @@ class _JoinFamilyPageState extends State<JoinFamilyPage> {
 
       context.go('/app');
     } catch (e) {
+     
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(

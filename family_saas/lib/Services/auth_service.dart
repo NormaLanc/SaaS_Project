@@ -25,7 +25,7 @@ class AuthService {
   }) async {
 
     await supabase
-        .from('profiles')
+        .from('Profiles')
         .insert({
 
       'user_id': userId,

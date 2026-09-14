@@ -30,76 +30,187 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
 
   String? selectedFamilyId;
 
+  Map<String, dynamic>? userProfile;
+
+  String? profilePhotoUrl;
+
+  bool isLoadingProfile = true;
+
   @override
   void initState() {
     super.initState();
     checkFamilyMembership();
     loadFeed();
     loadUpcomingEvents();
+    loadUserProfile();
   }
 
 Future<void> checkFamilyMembership() async {
   try {
-    final user = supabase.auth.currentUser;
+    final user =
+        supabase.auth.currentUser;
 
     if (user == null) {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
-
-      return;
-    }
-
-    // Get all approved family memberships for this user.
-    final membershipResponse = await supabase
-        .from('Family_Members')
-        .select('family_id')
-        .eq('user_id', user.id)
-        .eq('status', 'approved');
-
-    final memberships =
-        List<Map<String, dynamic>>.from(membershipResponse);
-
-    // If user does not belong to any approved families.
-    if (memberships.isEmpty) {
       if (!mounted) return;
 
       setState(() {
-        hasApprovedFamily = false;
         families = [];
         selectedFamilyId = null;
+        hasApprovedFamily = false;
         isLoading = false;
       });
 
       return;
     }
 
-    // Get all of the family IDs.
-    final familyIds = memberships
-        .map((membership) => membership['family_id'])
-        .where((id) => id != null)
-        .toList();
+    // ==========================================
+    // FAMILIES CREATED BY THE USER
+    // ==========================================
 
-    // Load the actual family records.
-    final familyResponse = await supabase
-        .from('Families')
-        .select('id, family_name')
-        .inFilter('id', familyIds)
-        .order('family_name');
+    final createdFamiliesResponse =
+        await supabase
+            .from('Families')
+            .select(
+              'id, family_name',
+            )
+            .eq(
+              'created_by',
+              user.id,
+            );
+
+    final createdFamilies =
+        List<Map<String, dynamic>>.from(
+      createdFamiliesResponse,
+    );
+
+    // ==========================================
+    // FAMILIES THE USER JOINED
+    // ==========================================
+
+    final membershipResponse =
+        await supabase
+            .from('Family_Members')
+            .select(
+              'family_id',
+            )
+            .eq(
+              'user_id',
+              user.id,
+            )
+            .eq(
+              'status',
+              'approved',
+            );
+
+    final memberships =
+        List<Map<String, dynamic>>.from(
+      membershipResponse,
+    );
+
+    final joinedFamilyIds =
+        memberships
+            .map(
+              (membership) =>
+                  membership['family_id']
+                      ?.toString(),
+            )
+            .whereType<String>()
+            .toList();
+
+    List<Map<String, dynamic>>
+        joinedFamilies = [];
+
+    if (joinedFamilyIds.isNotEmpty) {
+      final joinedFamiliesResponse =
+          await supabase
+              .from('Families')
+              .select(
+                'id, family_name',
+              )
+              .inFilter(
+                'id',
+                joinedFamilyIds,
+              );
+
+      joinedFamilies =
+          List<Map<String, dynamic>>.from(
+        joinedFamiliesResponse,
+      );
+    }
+
+    // ==========================================
+    // COMBINE BOTH LISTS
+    // ==========================================
+
+    final combinedFamilies = [
+      ...createdFamilies,
+      ...joinedFamilies,
+    ];
+
+    // Remove duplicates.
+    final uniqueFamilies =
+        <String, Map<String, dynamic>>{};
+
+    for (final family
+        in combinedFamilies) {
+      final familyId =
+          family['id'].toString();
+
+      uniqueFamilies[familyId] =
+          family;
+    }
+
+    final finalFamilies =
+        uniqueFamilies.values.toList();
+
+    finalFamilies.sort(
+      (a, b) {
+        final aName =
+            a['family_name']
+                    ?.toString()
+                    .toLowerCase() ??
+                '';
+
+        final bName =
+            b['family_name']
+                    ?.toString()
+                    .toLowerCase() ??
+                '';
+
+        return aName.compareTo(
+          bName,
+        );
+      },
+    );
 
     if (!mounted) return;
 
     setState(() {
-      families =
-          List<Map<String, dynamic>>.from(familyResponse);
+      families = finalFamilies;
 
-      hasApprovedFamily = families.isNotEmpty;
+      hasApprovedFamily =
+          finalFamilies.isNotEmpty;
 
-      if (families.isNotEmpty) {
+      // IMPORTANT:
+      // Make sure the selected family
+      // still actually exists.
+      final selectedStillExists =
+          selectedFamilyId != null &&
+          finalFamilies.any(
+            (family) =>
+                family['id']
+                    .toString() ==
+                selectedFamilyId,
+          );
+
+      if (selectedStillExists) {
+        // Keep the current selection.
+      } else if (finalFamilies.isNotEmpty) {
         selectedFamilyId =
-            families.first['id'].toString();
+            finalFamilies.first['id']
+                .toString();
+      } else {
+        selectedFamilyId = null;
       }
 
       isLoading = false;
@@ -111,7 +222,8 @@ Future<void> checkFamilyMembership() async {
       isLoading = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
       SnackBar(
         content: Text(
           'Error loading families: $e',
@@ -122,7 +234,7 @@ Future<void> checkFamilyMembership() async {
 }
 
 //Dialog box to ask the user if they want to join an existing family or create a new one
-  void showFamilyOptions() {
+void showFamilyOptions() {
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
@@ -157,7 +269,7 @@ Future<void> checkFamilyMembership() async {
     );
   }
 
-  Future<void> loadFeed() async {
+Future<void> loadFeed() async {
   try {
     final user = supabase.auth.currentUser;
 
@@ -747,7 +859,7 @@ Future<void> loadUpcomingEvents() async {
   }
 }
   
-  Widget buildUpcomingEventCard(
+Widget buildUpcomingEventCard(
   Map<String, dynamic> event,
 ) {
   final startDate =
@@ -894,6 +1006,158 @@ Future<void> loadUpcomingEvents() async {
   );
 }
 
+Future<void> loadUserProfile() async {
+  final user =
+      supabase.auth.currentUser;
+
+  if (user == null) {
+    return;
+  }
+
+  try {
+    final response =
+        await supabase
+            .from('Profiles')
+            .select(
+              '''
+              first_name,
+              last_name,
+              profile_photo_path
+              ''',
+            )
+            .eq(
+              'user_id',
+              user.id,
+            )
+            .maybeSingle();
+
+    String? signedPhotoUrl;
+
+    if (response != null) {
+      final photoPath =
+          response[
+                  'profile_photo_path']
+              ?.toString();
+
+      if (photoPath != null &&
+          photoPath.isNotEmpty) {
+        signedPhotoUrl =
+            await supabase.storage
+                .from('profile-photos')
+                .createSignedUrl(
+                  photoPath,
+                  3600,
+                );
+      }
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      userProfile = response;
+
+      profilePhotoUrl =
+          signedPhotoUrl;
+
+      isLoadingProfile =
+          false;
+    });
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() {
+      isLoadingProfile =
+          false;
+    });
+
+    debugPrint(
+      'Unable to load user profile: $e',
+    );
+  }
+}
+
+Widget buildProfileHeader() {
+  if (isLoadingProfile) {
+    return const SizedBox.shrink();
+  }
+
+  final firstName =
+      userProfile?['first_name']
+          ?.toString() ??
+      '';
+
+  final lastName =
+      userProfile?['last_name']
+          ?.toString() ??
+      '';
+
+  final fullName = [
+    firstName,
+    lastName,
+  ]
+      .where(
+        (name) =>
+            name.trim().isNotEmpty,
+      )
+      .join(' ');
+
+  return InkWell(
+    borderRadius:
+        BorderRadius.circular(30),
+
+    onTap: () {
+      context.go('/profile');
+    },
+
+    child: Padding(
+      padding:
+          const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 4,
+      ),
+
+      child: Row(
+        mainAxisSize:
+            MainAxisSize.min,
+
+        children: [
+          CircleAvatar(
+            radius: 18,
+
+            backgroundImage:
+                profilePhotoUrl != null
+                    ? NetworkImage(
+                        profilePhotoUrl!,
+                      )
+                    : null,
+
+            child:
+                profilePhotoUrl == null
+                    ? const Icon(
+                        Icons.person,
+                        size: 20,
+                      )
+                    : null,
+          ),
+
+          const SizedBox(
+            width: 8,
+          ),
+
+          if (fullName.isNotEmpty)
+            Text(
+              fullName,
+              style:
+                  const TextStyle(
+                fontWeight:
+                    FontWeight.w600,
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context){
@@ -909,19 +1173,99 @@ Future<void> loadUpcomingEvents() async {
             tooltip: "Add Family",
             onPressed: showFamilyOptions,
           ),
+          // buildProfileHeader(),
+          // const SizedBox(width: 8,),
         ],
       ),
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(
-                color: Colors.black,
+                  DrawerHeader(
+        child: InkWell(
+          onTap: () async {
+            Navigator.of(context).pop();
+
+            await context.push(
+              '/profile',
+            );
+
+            loadUserProfile();
+          },
+
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 30,
+
+                backgroundImage:
+                    profilePhotoUrl != null
+                        ? NetworkImage(
+                            profilePhotoUrl!,
+                          )
+                        : null,
+
+                child:
+                    profilePhotoUrl == null
+                        ? const Icon(
+                            Icons.person,
+                            size: 30,
+                          )
+                        : null,
               ),
-              child: Text('Menu'),
-            ),
-            if (families.isNotEmpty)
+
+              const SizedBox(
+                width: 12,
+              ),
+
+              Expanded(
+                child: Column(
+                  mainAxisAlignment:
+                      MainAxisAlignment.center,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      [
+                        userProfile?['first_name']
+                                ?.toString() ??
+                            '',
+                        userProfile?['last_name']
+                                ?.toString() ??
+                            '',
+                      ]
+                          .where(
+                            (name) =>
+                                name
+                                    .trim()
+                                    .isNotEmpty,
+                          )
+                          .join(' '),
+
+                      style:
+                          const TextStyle(
+                        fontSize: 18,
+                        fontWeight:
+                            FontWeight.bold,
+                      ),
+                    ),
+
+                    const SizedBox(
+                      height: 4,
+                    ),
+
+                    const Text(
+                      'View Profile',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+
+  if (families.isNotEmpty)
   Padding(
     padding: const EdgeInsets.fromLTRB(
       16,
@@ -931,35 +1275,37 @@ Future<void> loadUpcomingEvents() async {
     ),
     child: DropdownButtonFormField<String>(
       initialValue: selectedFamilyId,
-
       decoration: const InputDecoration(
-        labelText: "Family",
-        prefixIcon: Icon(Icons.family_restroom),
+        labelText: 'Family',
+        prefixIcon: Icon(
+          Icons.family_restroom,
+        ),
         border: OutlineInputBorder(),
       ),
-
-      items: families.map((family) {
-        return DropdownMenuItem<String>(
-          value: family['id'].toString(),
-
-          child: Text(
-            family['family_name']?.toString() ??
-                "Unnamed Family",
-          ),
-        );
-      }).toList(),
-
+      items: families.map(
+        (family) {
+          return DropdownMenuItem<String>(
+            value: family['id'].toString(),
+            child: Text(
+              family['family_name']
+                      ?.toString() ??
+                  'Unnamed Family',
+            ),
+          );
+        },
+      ).toList(),
       onChanged: (familyId) {
-        if (familyId == null) return;
+        if (familyId == null) {
+          return;
+        }
 
         setState(() {
-          selectedFamilyId = familyId;
+          selectedFamilyId =
+              familyId;
         });
 
-        // Close the menu.
         Navigator.pop(context);
 
-        // Open the selected family's page.
         context.push(
           '/family/$familyId',
         );
@@ -973,41 +1319,26 @@ Future<void> loadUpcomingEvents() async {
                 // Navigate to the home page
                 Navigator.pop(context);
                 context.go('/app');
-                //context.go('/home');
               },
             ),
             ListTile(
-              leading: const Icon(Icons.calendar_month),
-              title: const Text('Calendar'),
+              leading: const Icon(Icons.notifications_outlined,),
+              title: const Text('Notifications',),
               onTap: () {
                 Navigator.pop(context);
-                context.go('/calendar');
-              },
-            ),
-
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Photos'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go('/photos');
-              },
-            ),
-
-            ListTile(
-              leading: const Icon(Icons.child_care),
-              title: const Text('Children'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go('/children');
-              },
-            ),
+                context.push('/notifications',);
+            },
+          ),
             ListTile(
               leading: const Icon(Icons.person),
               title: const Text('Profile'),
-              onTap: () {
-                // Navigate to the profile page
-                context.go('/profile');
+              onTap: () async {
+          Navigator.of(context).pop();
+
+          await context.push(
+            '/profile',
+          );
+          loadUserProfile();
               },
             ),
             ListTile(
@@ -1036,9 +1367,12 @@ Future<void> loadUpcomingEvents() async {
                 )
               : RefreshIndicator(
                 onRefresh: () async {
+                  await checkFamilyMembership();
+
                   await Future.wait([
                     loadFeed(),
                     loadUpcomingEvents(),
+                    loadUserProfile(),
                   ]);
                 },
                 child: ListView(

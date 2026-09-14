@@ -99,6 +99,94 @@ class _FamilyCalendarPageState
     }).toList();
   }
 
+  Future<bool> confirmDelete({
+  required String title,
+  required String message,
+}) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(
+                dialogContext,
+                false,
+              );
+            },
+            child: const Text(
+              'Cancel',
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(
+                dialogContext,
+                true,
+              );
+            },
+            child: const Text(
+              'Delete',
+            ),
+          ),
+        ],
+      );
+    },
+  );
+
+  return result ?? false;
+}
+
+  Future<void> deleteEvent(
+  String eventId,
+) async {
+  final shouldDelete =
+      await confirmDelete(
+    title: 'Delete Event',
+    message:
+        'Are you sure you want to delete this event?',
+  );
+
+  if (!shouldDelete) return;
+
+  try {
+    await supabase
+        .from('Calendar_Events')
+        .delete()
+        .eq(
+          'id',
+          eventId,
+        );
+
+    await loadEvents();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Event deleted.',
+        ),
+      ),
+    );
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(
+          'Unable to delete event: $e',
+        ),
+      ),
+    );
+  }
+}
+
   @override
   Widget build(BuildContext context) {
     final selectedEvents =
@@ -219,30 +307,20 @@ class _FamilyCalendarPageState
                   child:
                       selectedEvents.isEmpty
                           ? const Center(
-                              child: Text(
-                                'No events for this day.',
-                              ),
+                              child: Text('No events for this day.',),
                             )
                           : ListView.builder(
                               padding:
-                                  const EdgeInsets.all(
-                                16,
-                              ),
-                              itemCount:
-                                  selectedEvents
-                                      .length,
+                                  const EdgeInsets.all(16,),
+                              itemCount: selectedEvents.length,
                               itemBuilder:
                                   (
                                 context,
                                 index,
                               ) {
-                                final event =
-                                    selectedEvents[
-                                        index];
+                                final event = selectedEvents[index];
 
-                                return buildEventCard(
-                                  event,
-                                );
+                                return buildEventCard(event,);
                               },
                             ),
                 ),
@@ -252,55 +330,71 @@ class _FamilyCalendarPageState
   }
 
   Widget buildEventCard(
-    Map<String, dynamic> event,
-  ) {
-    final start =
-        DateTime.parse(
-      event['start_at'].toString(),
-    ).toLocal();
+  Map<String, dynamic> event,
+) {
+  final start =
+      DateTime.parse(
+    event['start_at'].toString(),
+  ).toLocal();
 
-    return Card(
-      margin:
-          const EdgeInsets.only(
-        bottom: 12,
+  return Card(
+    margin:
+        const EdgeInsets.only(
+      bottom: 12,
+    ),
+    child: ListTile(
+      leading:
+          Icon(
+        eventIcon(
+          event['event_type'],
+        ),
       ),
-      child: ListTile(
-        leading:
-            Icon(
-          eventIcon(
-            event['event_type'],
+
+      title:
+          Text(
+        event['title'] ?? '',
+      ),
+
+      subtitle:
+          Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Text(
+            formatTime(start),
           ),
-        ),
 
-        title:
+          if (event['location'] !=
+              null)
             Text(
-          event['title'] ?? '',
-        ),
-
-        subtitle:
-            Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
-          children: [
-            Text(
-              formatTime(start),
+              event['location'],
             ),
+        ],
+      ),
 
-            if (event['location'] !=
-                null)
-              Text(
-                event['location'],
-              ),
-          ],
+      trailing:
+          IconButton(
+        tooltip:
+            'Delete Event',
+        icon:
+            const Icon(
+          Icons.delete_outline,
         ),
-
-        onTap: () {
-          // Later:
-          // open event details/edit page
+        onPressed: () {
+          deleteEvent(
+            event['id']
+                .toString(),
+          );
         },
       ),
-    );
-  }
+
+      onTap: () {
+        // Later:
+        // open event details/edit page
+      },
+    ),
+  );
+}
 
   IconData eventIcon(dynamic type) {
     switch (type) {
