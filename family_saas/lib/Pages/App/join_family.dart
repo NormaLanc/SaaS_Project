@@ -118,25 +118,31 @@ final invite = await supabase
       'can_view_calendar': invite['can_view_calendar'] ?? false,
       'can_edit_calendar': invite['can_edit_calendar'] ?? false,
 
-      'can_view_children': invite['can_view_children'] ?? false,
+      'can_view_child': invite['can_view_child'] ?? false,
       'can_post': invite['can_post'] ?? false,
 })
     .select()
     .single();
 
+    debugPrint(
+        'MEMBERSHIP CREATED: $membership',
+      );
 
-    final family = await supabase
-    .from('Families')
-    .select(
-      'id, family_name, created_by',
-    )
-    .eq(
-      'id',
-      invite['family_id'],
-    )
-    .single();
 
-    final familyOwnerId = family['created_by'];
+    // final family = await supabase
+    // .from('Families')
+    // .select(
+    //   'id, family_name, created_by',
+    // )
+    // .eq(
+    //   'id',
+    //   invite['family_id'],
+    // )
+    // .single();
+
+    // final familyOwnerId = family['created_by'];
+     final familyOwnerId = invite['created_by'];
+
 
     final requesterProfile =
       await supabase
@@ -167,12 +173,16 @@ final invite = await supabase
       'membership_id': membership['id'],
       'type': 'family_join_request',
       'title': 'Family Access Request',
-      'message': '$firstName $lastName has requested access to family "${family['family_name']}".',
+      'message': '$firstName $lastName has requested access to your family.',
       'status': 'active',
       'is_read': false,
       'action_required': true,
       'action_status': 'pending',
     });
+
+    debugPrint(
+      'NOTIFICATION CREATED SUCCESSFULLY',
+    );
 
       // Mark invite as used
       await supabase
@@ -196,8 +206,12 @@ final invite = await supabase
       );
 
       context.go('/app');
-    } catch (e) {
-     
+    } catch (e, stackTrace) {
+
+      //TODO: Delete later
+      debugPrint('Error occurred: $e');
+      debugPrint('Stack trace: $stackTrace');
+
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
