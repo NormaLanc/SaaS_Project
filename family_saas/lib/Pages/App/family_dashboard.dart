@@ -107,18 +107,17 @@ Future<void> checkFamilyMembership() async {
       membershipResponse,
     );
 
+    debugPrint('APPROVED MEMBERSHIPS: $memberships',);
+
     final joinedFamilyIds =
-        memberships
-            .map(
-              (membership) =>
-                  membership['family_id']
+        memberships.map(
+              (membership) => membership['family_id']
                       ?.toString(),
             )
             .whereType<String>()
             .toList();
 
-    List<Map<String, dynamic>>
-        joinedFamilies = [];
+    List<Map<String, dynamic>> joinedFamilies = [];
 
     if (joinedFamilyIds.isNotEmpty) {
       final joinedFamiliesResponse =
@@ -136,6 +135,8 @@ Future<void> checkFamilyMembership() async {
           List<Map<String, dynamic>>.from(
         joinedFamiliesResponse,
       );
+
+      debugPrint('JOINED FAMILIES: $joinedFamilies',);
     }
 
     // ==========================================
@@ -1360,11 +1361,42 @@ Widget buildProfileHeader() {
               child: CircularProgressIndicator(),
             )
           : !hasApprovedFamily
-              ? const Center(
-                  child: Text(
-                    "Create a family or join an existing family to get started.",
-                  ),
-                )
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.family_restroom, size: 64,),
+
+                          const SizedBox(height: 16,),
+
+                          const Text("Create a family or join an existing family to get started.",
+                            textAlign: TextAlign.center,
+                          ),
+
+                          const SizedBox(height: 20,),
+
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              setState(() {
+                                isLoading = true;
+                            });
+
+                            await checkFamilyMembership();
+
+                            await Future.wait([
+                              loadFeed(),
+                              loadUpcomingEvents(),
+                            ]);
+                          },
+                icon: const Icon(Icons.refresh,),
+                label: const Text('Check for Family Access',),
+              ),
+            ],
+          ),
+        ),
+      )
               : RefreshIndicator(
                 onRefresh: () async {
                   await checkFamilyMembership();
