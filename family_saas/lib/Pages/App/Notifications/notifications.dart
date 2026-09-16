@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:go_router/go_router.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key,});
@@ -51,10 +52,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       if (!mounted) return;
 
       setState(() {
-        notifications =
-            List<
-                Map<String, dynamic>>
-                .from(data);
+        notifications = List<Map<String, dynamic>>.from(data);
 
         isLoading = false;
       });
@@ -68,9 +66,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       ScaffoldMessenger.of(context)
           .showSnackBar(
         SnackBar(
-          content: Text(
-            'Unable to load notifications: $e',
-          ),
+          content: Text('Unable to load notifications: $e',),
         ),
       );
     }
@@ -80,26 +76,43 @@ class _NotificationsPageState extends State<NotificationsPage> {
     Map<String, dynamic> notification,
   ) async {
 
-    final user =
-        supabase.auth.currentUser;
+    final user = supabase.auth.currentUser;
 
     if (user == null) return;
 
     try {
-      await supabase
-          .from('Family_Members')
-          .update({
-            'status':
-                'approved',
+      // await supabase
+      //     .from('Family_Members')
+      //     .update({
+      //       'status':
+      //           'approved',
 
-            'approved_by':
-                user.id,
-          })
-          .eq(
-            'id',
-            notification[
-                'membership_id'],
-          );
+      //       'approved_by':
+      //           user.id,
+      //     })
+      //     .eq(
+      //       'id',
+      //       notification['membership_id'],
+      //     );
+
+    final updatedMembership = await supabase
+      .from('Family_Members')
+      .update({
+        'status': 'approved',
+        'approved_by': user.id,
+      })
+      .eq(
+        'id',
+        notification['membership_id'],
+      )
+      .select()
+      .maybeSingle();
+
+    debugPrint('APPROVED MEMBERSHIP: $updatedMembership',);
+
+    if (updatedMembership == null) {
+      throw Exception('The membership could not be approved.',);
+    }
 
       await supabase
           .from('Notifications')
@@ -202,103 +215,65 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title:
-            const Text(
-          'Notifications',
+        leading: IconButton(
+        icon: const Icon(Icons.arrow_back,),
+        onPressed: () {
+          context.go('/app');
+          },
         ),
+        title: const Text('Notifications',),
       ),
 
       body: isLoading
           ? const Center(
-              child:
-                  CircularProgressIndicator(),
-            )
-
-          : notifications.isEmpty
+              child: CircularProgressIndicator(),
+            ) : notifications.isEmpty
 
               ? const Center(
-                  child: Text(
-                    'No notifications yet.',
-                  ),
+                  child: Text('No notifications yet.',),
                 )
 
               : RefreshIndicator(
-                  onRefresh:
-                      loadNotifications,
+                  onRefresh: loadNotifications,
 
-                  child:
-                      ListView.builder(
-                    padding:
-                        const EdgeInsets
-                            .all(16),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
 
-                    itemCount:
-                        notifications
-                            .length,
+                    itemCount: notifications.length,
 
-                    itemBuilder:
-                        (
-                      context,
-                      index,
-                    ) {
+                    itemBuilder: (context,index,) {
 
-                      final notification =
-                          notifications[
-                              index];
+                      final notification = notifications[index];
 
-                      final type =
-                          notification[
-                                  'type']
-                              ?.toString();
+                      final type = notification['type']?.toString();
 
-                      final actionStatus =
-                          notification[
-                                  'action_status']
-                              ?.toString();
+                      final actionStatus = notification['action_status']?.toString();
 
                       return Card(
-                        margin:
-                            const EdgeInsets
-                                .only(
+                        margin: const EdgeInsets.only(
                           bottom: 16,
                         ),
 
                         child: Padding(
-                          padding:
-                              const EdgeInsets
-                                  .all(16),
+                          padding: const EdgeInsets.all(16),
 
                           child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment
-                                    .start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
 
                             children: [
 
-                              Text(
-                                notification[
-                                            'title']
-                                        ?.toString() ??
-                                    'Notification',
+                              Text(notification['title']?.toString() ?? 'Notification',
 
                                 style:
                                     const TextStyle(
                                   fontSize: 18,
-                                  fontWeight:
-                                      FontWeight
-                                          .bold,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
 
-                              const SizedBox(
-                                height: 8,
-                              ),
+                              const SizedBox(height: 8,),
 
-                              Text(
-                                notification['message']
-                                        ?.toString() ??
-                                    '',
-                              ),
+                              Text(notification['message']?.toString() ?? '',),
 
                               if (type == 'family_join_request' && actionStatus == 'pending') ...[
 
