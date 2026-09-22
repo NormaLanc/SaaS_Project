@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../Styling/folktri_colors.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 
 
@@ -479,103 +480,251 @@ Widget buildPhotoFeedCard(
   final childData =
       photo['child'];
 
-  String? childName;
+String childName = '';
 
-  if (childData != null) {
-    final firstName =
-        childData['first_name'] ?? '';
-
-    final middleName =
-        childData['middle_name'] ?? '';
-
-    final lastName =
-        childData['last_name'] ?? '';
-
-    final name = [
-      firstName,
-      middleName,
-      lastName,
+  if (childData is Map) {
+    childName = [
+      childData['first_name'],
+      childData['middle_name'],
+      childData['last_name'],
     ]
         .where(
           (value) =>
-              value
-                  .toString()
-                  .trim()
-                  .isNotEmpty,
+              value != null &&
+              value.toString().trim().isNotEmpty,
         )
         .join(' ');
-
-    if (name.isNotEmpty) {
-      childName = name;
-    }
   }
 
-  return Card(
-    margin:
-        const EdgeInsets.only(
-      bottom: 16,
+  final caption =
+      photo['caption']?.toString().trim() ?? '';
+
+  final photoUrl =
+      photo['photo_url']?.toString() ?? '';
+
+  final createdAt = DateTime.tryParse(
+    photo['created_at']?.toString() ?? '',
+  )?.toLocal();
+
+  final dateLabel = createdAt == null
+      ? 'Family photo'
+      : '${createdAt.month}/${createdAt.day}/${createdAt.year}';
+
+  return Container(
+    margin: const EdgeInsets.only(bottom: 16),
+    decoration: BoxDecoration(
+      color: FolktriColors.surface,
+      borderRadius: BorderRadius.circular(18),
+      boxShadow: [
+        BoxShadow(
+          color: FolktriColors.midnightIndigo
+              .withValues(alpha: 0.05),
+          blurRadius: 14,
+          offset: const Offset(0, 4),
+        ),
+      ],
     ),
     child: Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding:
-              const EdgeInsets.all(
-            16,
-          ),
+          padding: const EdgeInsets.all(14),
           child: Row(
             children: [
               const CircleAvatar(
+                radius: 20,
+                backgroundColor:
+                    FolktriColors.lightLavender,
                 child: Icon(
-                  Icons.photo,
+                  Icons.family_restroom_rounded,
+                  color: FolktriColors.primaryIndigo,
                 ),
               ),
 
-              const SizedBox(
-                width: 12,
-              ),
+              const SizedBox(width: 10),
 
               Expanded(
-                child: Text(
-                  childName != null
-                      ? 'New photo of $childName'
-                      : 'New family photo',
-                  style:
-                      const TextStyle(
-                    fontWeight:
-                        FontWeight.bold,
-                  ),
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      childName.isNotEmpty
+                          ? 'A moment with $childName'
+                          : 'Family photo',
+                      style: const TextStyle(
+                        color: FolktriColors.primaryText,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+
+                    const SizedBox(height: 3),
+
+                    Text(
+                      '$dateLabel · Family only',
+                      style: const TextStyle(
+                        color:
+                            FolktriColors.secondaryText,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+
+              const Icon(
+                Icons.lock_outline_rounded,
+                size: 16,
+                color: FolktriColors.secondaryText,
               ),
             ],
           ),
         ),
 
-        if (photo['photo_url'] !=
-            null)
-          Image.network(
-            photo['photo_url'],
-            width:
-                double.infinity,
-            height: 300,
-            fit:
-                BoxFit.cover,
+        if (caption.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              14, 0, 14, 12,
+            ),
+            child: Text(
+              caption,
+              style: const TextStyle(
+                color: FolktriColors.primaryText,
+                fontSize: 14,
+                height: 1.4,
+              ),
+            ),
           ),
 
-        if (photo['caption'] !=
-            null)
-          Padding(
-            padding:
-                const EdgeInsets
-                    .all(16),
-            child: Text(
-              photo['caption'],
+        if (photoUrl.isNotEmpty)
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(
+              bottom: Radius.circular(18),
+            ),
+            child: Image.network(
+              photoUrl,
+              width: double.infinity,
+              height: 260,
+              fit: BoxFit.cover,
+              errorBuilder: (
+                context,
+                error,
+                stackTrace,
+              ) {
+                return Container(
+                  height: 180,
+                  alignment: Alignment.center,
+                  color: FolktriColors.lightLavender,
+                  child: const Icon(
+                    Icons.broken_image_outlined,
+                    color: FolktriColors.primaryIndigo,
+                    size: 36,
+                  ),
+                );
+              },
             ),
           ),
       ],
     ),
   );
+  // String? childName;
+
+  // if (childData != null) {
+  //   final firstName =
+  //       childData['first_name'] ?? '';
+
+  //   final middleName =
+  //       childData['middle_name'] ?? '';
+
+  //   final lastName =
+  //       childData['last_name'] ?? '';
+
+  //   final name = [
+  //     firstName,
+  //     middleName,
+  //     lastName,
+  //   ]
+  //       .where(
+  //         (value) =>
+  //             value
+  //                 .toString()
+  //                 .trim()
+  //                 .isNotEmpty,
+  //       )
+  //       .join(' ');
+
+  //   if (name.isNotEmpty) {
+  //     childName = name;
+  //   }
+  // }
+
+  // return Card(
+  //   margin:
+  //       const EdgeInsets.only(
+  //     bottom: 16,
+  //   ),
+  //   child: Column(
+  //     crossAxisAlignment:
+  //         CrossAxisAlignment.start,
+  //     children: [
+  //       Padding(
+  //         padding:
+  //             const EdgeInsets.all(
+  //           16,
+  //         ),
+  //         child: Row(
+  //           children: [
+  //             const CircleAvatar(
+  //               child: Icon(
+  //                 Icons.photo,
+  //               ),
+  //             ),
+
+  //             const SizedBox(
+  //               width: 12,
+  //             ),
+
+  //             Expanded(
+  //               child: Text(
+  //                 childName != null
+  //                     ? 'New photo of $childName'
+  //                     : 'New family photo',
+  //                 style:
+  //                     const TextStyle(
+  //                   fontWeight:
+  //                       FontWeight.bold,
+  //                 ),
+  //               ),
+  //             ),
+  //           ],
+  //         ),
+  //       ),
+
+  //       if (photo['photo_url'] !=
+  //           null)
+  //         Image.network(
+  //           photo['photo_url'],
+  //           width:
+  //               double.infinity,
+  //           height: 300,
+  //           fit:
+  //               BoxFit.cover,
+  //         ),
+
+  //       if (photo['caption'] !=
+  //           null)
+  //         Padding(
+  //           padding:
+  //               const EdgeInsets
+  //                   .all(16),
+  //           child: Text(
+  //             photo['caption'],
+  //           ),
+  //         ),
+  //     ],
+  //   ),
+  // );
 }
 
 Widget buildMilestoneFeedCard(
@@ -586,147 +735,582 @@ Widget buildMilestoneFeedCard(
 
   String childName = 'A child';
 
-  if (childData != null) {
-    final firstName =
-        childData['first_name'] ?? '';
-
-    final middleName =
-        childData['middle_name'] ?? '';
-
-    final lastName =
-        childData['last_name'] ?? '';
-
-    childName = [
-      firstName,
-      middleName,
-      lastName,
+  if (childData is Map) {
+    final name = [
+      childData['first_name'],
+      childData['middle_name'],
+      childData['last_name'],
     ]
         .where(
-          (name) =>
-              name
-                  .toString()
-                  .trim()
-                  .isNotEmpty,
+          (value) =>
+              value != null &&
+              value.toString().trim().isNotEmpty,
         )
+        .map((value) => value.toString().trim())
         .join(' ');
+
+    if (name.isNotEmpty) {
+      childName = name;
+    }
   }
 
-  return Card(
+  final title =
+      milestone['title']?.toString().trim() ?? '';
+
+  final description =
+      milestone['description']?.toString().trim() ?? '';
+
+  final photoUrl =
+      milestone['photo_url']?.toString().trim() ?? '';
+
+  final childId =
+      milestone['child_id']?.toString();
+
+  final milestoneDate = DateTime.tryParse(
+    milestone['event_date']?.toString() ?? '',
+  );
+
+  final createdAt = DateTime.tryParse(
+    milestone['created_at']?.toString() ?? '',
+  )?.toLocal();
+
+  // Display the date when the milestone occurred.
+  final dateLabel = milestoneDate == null
+      ? 'Milestone'
+      : '${milestoneDate.month}/'
+        '${milestoneDate.day}/'
+        '${milestoneDate.year}';
+
+  // Display when the milestone was shared.
+  String sharedLabel = 'Family milestone';
+
+  if (createdAt != null) {
+    final difference =
+        DateTime.now().difference(createdAt);
+
+    if (difference.isNegative ||
+        difference.inMinutes < 1) {
+      sharedLabel = 'Just now';
+    } else if (difference.inMinutes < 60) {
+      sharedLabel =
+          '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      sharedLabel =
+          '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      sharedLabel =
+          '${difference.inDays}d ago';
+    } else {
+      sharedLabel =
+          '${createdAt.month}/'
+          '${createdAt.day}/'
+          '${createdAt.year}';
+    }
+  }
+
+  // ==========================================
+  // MILESTONE CARD
+  // ==========================================
+
+  return Container(
     margin: const EdgeInsets.only(
       bottom: 16,
     ),
-    child: InkWell(
-      borderRadius:
-          BorderRadius.circular(12),
-      onTap: () {
-        final childId =
-            milestone['child_id'];
 
-        if (childId != null) {
-          context.push(
-            '/child/$childId',
-          );
-        }
-      },
-      child: Padding(
-        padding:
-            const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: FolktriColors.surface,
+
+      borderRadius: BorderRadius.circular(18),
+
+      boxShadow: [
+        BoxShadow(
+          color: FolktriColors.midnightIndigo
+              .withValues(alpha: 0.05),
+          blurRadius: 14,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+
+    child: Material(
+      color: Colors.transparent,
+
+      borderRadius: BorderRadius.circular(18),
+
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+
+        onTap: childId == null || childId.isEmpty
+            ? null
+            : () {
+                context.push(
+                  '/child/$childId',
+                );
+              },
+
         child: Column(
           crossAxisAlignment:
               CrossAxisAlignment.start,
+
           children: [
-            Row(
-              children: [
-                const CircleAvatar(
-                  child: Icon(
-                    Icons.emoji_events,
-                  ),
-                ),
+            // ==================================
+            // HEADER
+            // ==================================
 
-                const SizedBox(
-                  width: 12,
-                ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                14, 14, 14, 12,
+              ),
 
-                Expanded(
-                  child: Text(
-                    '$childName reached a milestone',
-                    style:
-                        const TextStyle(
-                      fontWeight:
-                          FontWeight.bold,
+              child: Row(
+                children: [
+                  // Milestone avatar
+                  const CircleAvatar(
+                    radius: 21,
+
+                    backgroundColor:
+                        FolktriColors.lightLavender,
+
+                    child: Icon(
+                      Icons.auto_awesome_rounded,
+                      color:
+                          FolktriColors.primaryIndigo,
+                      size: 21,
                     ),
                   ),
-                ),
-              ],
+
+                  const SizedBox(width: 10),
+
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+
+                      children: [
+                        Text(
+                          '$childName reached a milestone',
+                          maxLines: 2,
+                          overflow:
+                              TextOverflow.ellipsis,
+
+                          style: const TextStyle(
+                            color:
+                                FolktriColors.primaryText,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        const SizedBox(height: 4),
+
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                sharedLabel,
+                                maxLines: 1,
+                                overflow:
+                                    TextOverflow.ellipsis,
+
+                                style: const TextStyle(
+                                  color:
+                                      FolktriColors.secondaryText,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(width: 5),
+
+                            const Text(
+                              '·',
+                              style: TextStyle(
+                                color:
+                                    FolktriColors.secondaryText,
+                              ),
+                            ),
+
+                            const SizedBox(width: 5),
+
+                            const Icon(
+                              Icons.lock_outline_rounded,
+                              color:
+                                  FolktriColors.secondaryText,
+                              size: 12,
+                            ),
+
+                            const SizedBox(width: 3),
+
+                            const Text(
+                              'Family only',
+                              style: TextStyle(
+                                color:
+                                    FolktriColors.secondaryText,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Decorative milestone indicator
+                  const Icon(
+                    Icons.stars_rounded,
+                    color: FolktriColors.dustyRose,
+                    size: 23,
+                  ),
+                ],
+              ),
             ),
 
-            const SizedBox(
-              height: 16,
+            // ==================================
+            // MILESTONE TITLE AND DESCRIPTION
+            // ==================================
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                14, 0, 14, 12,
+              ),
+
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+
+                children: [
+                  if (title.isNotEmpty)
+                    Text(
+                      title,
+
+                      style: const TextStyle(
+                        color:
+                            FolktriColors.primaryText,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        height: 1.3,
+                      ),
+                    ),
+
+                  if (description.isNotEmpty) ...[
+                    const SizedBox(height: 7),
+
+                    Text(
+                      description,
+
+                      style: const TextStyle(
+                        color:
+                            FolktriColors.primaryText,
+                        fontSize: 14,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 10),
+
+                  // Date of the milestone
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+
+                    decoration: BoxDecoration(
+                      color: FolktriColors.lightLavender
+                          .withValues(alpha: 0.55),
+
+                      borderRadius:
+                          BorderRadius.circular(20),
+                    ),
+
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+
+                      children: [
+                        const Icon(
+                          Icons.event_available_outlined,
+                          size: 14,
+                          color:
+                              FolktriColors.primaryIndigo,
+                        ),
+
+                        const SizedBox(width: 5),
+
+                        Text(
+                          'Milestone date: $dateLabel',
+
+                          style: const TextStyle(
+                            color:
+                                FolktriColors.midnightIndigo,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
 
-            if (milestone[
-                    'photo_url'] !=
-                null)
-              ClipRRect(
-                borderRadius:
-                    BorderRadius.circular(
-                  12,
-                ),
-                child: Image.network(
-                  milestone[
-                      'photo_url'],
-                  width:
-                      double.infinity,
-                  height: 220,
-                  fit:
-                      BoxFit.cover,
-                ),
+            // ==================================
+            // MILESTONE PHOTO
+            // ==================================
+
+            if (photoUrl.isNotEmpty)
+              Image.network(
+                photoUrl,
+
+                width: double.infinity,
+                height: 260,
+                fit: BoxFit.cover,
+
+                errorBuilder: (
+                  context,
+                  error,
+                  stackTrace,
+                ) {
+                  return Container(
+                    width: double.infinity,
+                    height: 180,
+
+                    color:
+                        FolktriColors.lightLavender,
+
+                    alignment: Alignment.center,
+
+                    child: const Column(
+                      mainAxisSize:
+                          MainAxisSize.min,
+
+                      children: [
+                        Icon(
+                          Icons.image_not_supported_outlined,
+                          color:
+                              FolktriColors.primaryIndigo,
+                          size: 34,
+                        ),
+
+                        SizedBox(height: 8),
+
+                        Text(
+                          'Unable to load milestone photo',
+                          style: TextStyle(
+                            color:
+                                FolktriColors.secondaryText,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
 
-            if (milestone[
-                    'photo_url'] !=
-                null)
-              const SizedBox(
-                height: 16,
+            // ==================================
+            // CARD FOOTER
+            // ==================================
+
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
               ),
 
-            Text(
-              milestone['title'] ?? '',
-              style:
-                  Theme.of(context)
-                      .textTheme
-                      .titleLarge,
-            ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.favorite_border_rounded,
+                    color: FolktriColors.dustyRose,
+                    size: 20,
+                  ),
 
-            if (milestone[
-                    'description'] !=
-                null) ...[
-              const SizedBox(
-                height: 8,
+                  const SizedBox(width: 6),
+
+                  const Text(
+                    'A special family moment',
+                    style: TextStyle(
+                      color:
+                          FolktriColors.secondaryText,
+                      fontSize: 12,
+                    ),
+                  ),
+
+                  const Spacer(),
+
+                  if (childId != null &&
+                      childId.isNotEmpty) ...[
+                    const Text(
+                      'View profile',
+                      style: TextStyle(
+                        color:
+                            FolktriColors.primaryIndigo,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+
+                    const SizedBox(width: 4),
+
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color:
+                          FolktriColors.primaryIndigo,
+                      size: 12,
+                    ),
+                  ],
+                ],
               ),
-              Text(
-                milestone[
-                    'description'],
-              ),
-            ],
-
-            const SizedBox(
-              height: 12,
-            ),
-
-            Text(
-              milestone['event_date']
-                  .toString(),
-              style:
-                  Theme.of(context)
-                      .textTheme
-                      .bodySmall,
             ),
           ],
         ),
       ),
     ),
   );
+
+  // if (childData != null) {
+  //   final firstName =
+  //       childData['first_name'] ?? '';
+
+  //   final middleName =
+  //       childData['middle_name'] ?? '';
+
+  //   final lastName =
+  //       childData['last_name'] ?? '';
+
+  //   childName = [
+  //     firstName,
+  //     middleName,
+  //     lastName,
+  //   ]
+  //       .where(
+  //         (name) =>
+  //             name
+  //                 .toString()
+  //                 .trim()
+  //                 .isNotEmpty,
+  //       )
+  //       .join(' ');
+  // }
+
+  // return Card(
+  //   margin: const EdgeInsets.only(
+  //     bottom: 16,
+  //   ),
+  //   child: InkWell(
+  //     borderRadius:
+  //         BorderRadius.circular(12),
+  //     onTap: () {
+  //       final childId =
+  //           milestone['child_id'];
+
+  //       if (childId != null) {
+  //         context.push(
+  //           '/child/$childId',
+  //         );
+  //       }
+  //     },
+  //     child: Padding(
+  //       padding:
+  //           const EdgeInsets.all(16),
+  //       child: Column(
+  //         crossAxisAlignment:
+  //             CrossAxisAlignment.start,
+  //         children: [
+  //           Row(
+  //             children: [
+  //               const CircleAvatar(
+  //                 child: Icon(
+  //                   Icons.emoji_events,
+  //                 ),
+  //               ),
+
+  //               const SizedBox(
+  //                 width: 12,
+  //               ),
+
+  //               Expanded(
+  //                 child: Text(
+  //                   '$childName reached a milestone',
+  //                   style:
+  //                       const TextStyle(
+  //                     fontWeight:
+  //                         FontWeight.bold,
+  //                   ),
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+
+  //           const SizedBox(
+  //             height: 16,
+  //           ),
+
+  //           if (milestone[
+  //                   'photo_url'] !=
+  //               null)
+  //             ClipRRect(
+  //               borderRadius:
+  //                   BorderRadius.circular(
+  //                 12,
+  //               ),
+  //               child: Image.network(
+  //                 milestone[
+  //                     'photo_url'],
+  //                 width:
+  //                     double.infinity,
+  //                 height: 220,
+  //                 fit:
+  //                     BoxFit.cover,
+  //               ),
+  //             ),
+
+  //           if (milestone[
+  //                   'photo_url'] !=
+  //               null)
+  //             const SizedBox(
+  //               height: 16,
+  //             ),
+
+  //           Text(
+  //             milestone['title'] ?? '',
+  //             style:
+  //                 Theme.of(context)
+  //                     .textTheme
+  //                     .titleLarge,
+  //           ),
+
+  //           if (milestone[
+  //                   'description'] !=
+  //               null) ...[
+  //             const SizedBox(
+  //               height: 8,
+  //             ),
+  //             Text(
+  //               milestone[
+  //                   'description'],
+  //             ),
+  //           ],
+
+  //           const SizedBox(
+  //             height: 12,
+  //           ),
+
+  //           Text(
+  //             milestone['event_date']
+  //                 .toString(),
+  //             style:
+  //                 Theme.of(context)
+  //                     .textTheme
+  //                     .bodySmall,
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   ),
+  // );
 }
 
 Future<void> loadUpcomingEvents() async {
@@ -1161,18 +1745,490 @@ Widget buildProfileHeader() {
   );
 }
 
+Widget buildFamilySelector() {
+  final selectedFamily = families.where(
+    (family) =>
+        family['id']?.toString() == selectedFamilyId,
+  );
+
+  final familyName = selectedFamily.isNotEmpty
+      ? selectedFamily.first['family_name']
+              ?.toString() ??
+          'My Family'
+      : 'My Family';
+
+  return Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: FolktriColors.surface,
+      borderRadius: BorderRadius.circular(18),
+      boxShadow: [
+        BoxShadow(
+          color: FolktriColors.midnightIndigo
+              .withValues(alpha: 0.06),
+          blurRadius: 16,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        CircleAvatar(
+          radius: 25,
+          backgroundColor: FolktriColors.lightLavender,
+          child: const Icon(
+            Icons.family_restroom_rounded,
+            color: FolktriColors.primaryIndigo,
+          ),
+        ),
+
+        const SizedBox(width: 12),
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                familyName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: FolktriColors.primaryText,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
+
+              const SizedBox(height: 4),
+
+              const Row(
+                children: [
+                  Icon(
+                    Icons.lock_outline_rounded,
+                    size: 12,
+                    color: FolktriColors.secondaryText,
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    'Private family space',
+                    style: TextStyle(
+                      color: FolktriColors.secondaryText,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        PopupMenuButton<String>(
+          tooltip: 'Choose family',
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: FolktriColors.midnightIndigo,
+          ),
+          onSelected: (value) {
+            if (value == 'add') {
+              showFamilyOptions();
+              return;
+            }
+
+            setState(() {
+              selectedFamilyId = value;
+            });
+          },
+          itemBuilder: (context) => [
+            ...families.map(
+              (family) => PopupMenuItem<String>(
+                value: family['id'].toString(),
+                child: Text(
+                  family['family_name']?.toString() ??
+                      'Unnamed Family',
+                ),
+              ),
+            ),
+            const PopupMenuDivider(),
+            const PopupMenuItem<String>(
+              value: 'add',
+              child: Text('Add or join a family'),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+Widget buildQuickPostCard() {
+  return Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: FolktriColors.surface,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(
+        color: FolktriColors.lightLavender,
+      ),
+    ),
+    child: Column(
+      children: [
+        Row(
+          children: [
+            CircleAvatar(
+              radius: 19,
+              backgroundColor: FolktriColors.lightLavender,
+              backgroundImage: profilePhotoUrl != null
+                  ? NetworkImage(profilePhotoUrl!)
+                  : null,
+              child: profilePhotoUrl == null
+                  ? const Icon(
+                      Icons.person_rounded,
+                      color: FolktriColors.primaryIndigo,
+                    )
+                  : null,
+            ),
+
+            const SizedBox(width: 10),
+
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(24),
+                onTap: () {
+                  _showPostOptions();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 13,
+                  ),
+                  decoration: BoxDecoration(
+                    color: FolktriColors.background,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: FolktriColors.lightLavender,
+                    ),
+                  ),
+                  child: const Text(
+                    'Share a moment with your family...',
+                    style: TextStyle(
+                      color: FolktriColors.secondaryText,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        const Divider(
+          height: 1,
+          color: FolktriColors.lightLavender,
+        ),
+
+        const SizedBox(height: 10),
+
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _postAction(
+              Icons.photo_library_outlined,
+              'Photo',
+              FolktriColors.primaryIndigo,
+            ),
+            _postAction(
+              Icons.videocam_outlined,
+              'Video',
+              FolktriColors.primaryIndigo,
+            ),
+            _postAction(
+              Icons.event_outlined,
+              'Event',
+              FolktriColors.primaryIndigo,
+            ),
+            _postAction(
+              Icons.star_outline_rounded,
+              'Milestone',
+              FolktriColors.dustyRose,
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _postAction(
+  IconData icon,
+  String label,
+  Color color,
+) {
+  return InkWell(
+    borderRadius: BorderRadius.circular(10),
+    onTap: _showPostOptions,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 3,
+        vertical: 4,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 17, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: FolktriColors.primaryText,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+void _showPostOptions() {
+  final familyId = selectedFamilyId;
+
+  if (familyId == null) {
+    showFamilyOptions();
+    return;
+  }
+
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          20, 8, 20, 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Share with your family',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: FolktriColors.primaryText,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            ListTile(
+              leading: const Icon(
+                Icons.family_restroom_rounded,
+                color: FolktriColors.primaryIndigo,
+              ),
+              title: const Text('Open family page'),
+              subtitle: const Text(
+                'Share photos, milestones, and more.',
+              ),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                context.push('/family/$familyId');
+              },
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Widget buildTodaySection() {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            'Today',
+            style: TextStyle(
+              color: FolktriColors.primaryText,
+              fontSize: 19,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          TextButton(
+            onPressed: () {
+              final familyId = selectedFamilyId;
+              if (familyId != null) {
+                context.push(
+                  '/family/$familyId/calendar',
+                );
+              }
+            },
+            child: const Text(
+              'See all',
+              style: TextStyle(
+                color: FolktriColors.primaryIndigo,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+
+      const SizedBox(height: 4),
+
+      Row(
+        children: [
+          Expanded(
+            child: _todayCard(
+              icon: Icons.calendar_month_rounded,
+              title: 'Upcoming\nEvents',
+              detail: isLoadingEvents
+                  ? 'Loading...'
+                  : '${upcomingEvents.length} coming up',
+              background: FolktriColors.lightLavender,
+              accent: FolktriColors.primaryIndigo,
+              onTap: () {
+                final familyId = selectedFamilyId;
+                if (familyId != null) {
+                  context.push(
+                    '/family/$familyId/calendar',
+                  );
+                }
+              },
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          Expanded(
+            child: _todayCard(
+              icon: Icons.auto_awesome_rounded,
+              title: 'Family\nMoments',
+              detail: isLoadingFeed
+                  ? 'Loading...'
+                  : '${feedItems.length} shared',
+              background: FolktriColors.dustyRose
+                  .withValues(alpha: 0.17),
+              accent: FolktriColors.dustyRose,
+              onTap: () {
+                _showPostOptions();
+              },
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          Expanded(
+            child: _todayCard(
+              icon: Icons.photo_library_outlined,
+              title: 'Family\nPhotos',
+              detail: isLoadingFeed
+                  ? 'Loading...'
+                  : '${feedItems.where(
+                      (item) => item['type'] == 'photo',
+                    ).length} shared',
+              background: FolktriColors.lightLavender
+                  .withValues(alpha: 0.55),
+              accent: FolktriColors.primaryIndigo,
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Family Albums is coming soon!',
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+}
+
+Widget _todayCard({
+  required IconData icon,
+  required String title,
+  required String detail,
+  required Color background,
+  required Color accent,
+  required VoidCallback onTap,
+}) {
+  return Material(
+    color: background,
+    borderRadius: BorderRadius.circular(16),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: SizedBox(
+        height: 128,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 5,
+            vertical: 12,
+          ),
+          child: Column(
+            mainAxisAlignment:
+                MainAxisAlignment.spaceBetween,
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: FolktriColors.surface,
+                child: Icon(
+                  icon,
+                  color: accent,
+                  size: 19,
+                ),
+              ),
+
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: FolktriColors.primaryText,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+
+              Text(
+                detail,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: FolktriColors.secondaryText,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
   @override
   Widget build(BuildContext context){
 
     return Scaffold(
-
+      backgroundColor: FolktriColors.background,
       
       appBar: AppBar(
         backgroundColor: FolktriColors.midnightIndigo,
-        title: const Text("Folktri", 
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: FolktriColors.surface
+        elevation: 0,
+        toolbarHeight: 64,
+        title:  Text("Folktri", 
+          style: GoogleFonts.marckScript(
+            fontWeight: FontWeight.w400,
+            color: FolktriColors.surface,
+            fontSize: 34,
           ),
         ),
         actions: [
@@ -1195,186 +2251,9 @@ Widget buildProfileHeader() {
             },
           ),  
           // buildProfileHeader(),
-          // const SizedBox(width: 8,),
+           const SizedBox(width: 6,),
         ],
       ),
-  //     drawer: Drawer(
-  //       child: ListView(
-  //         padding: EdgeInsets.zero,
-  //         children: [
-  //                 DrawerHeader(
-  //       child: InkWell(
-  //         onTap: () async {
-  //           Navigator.of(context).pop();
-
-  //           await context.push(
-  //             '/profile',
-  //           );
-
-  //           loadUserProfile();
-  //         },
-
-  //         child: Row(
-  //           children: [
-  //             CircleAvatar(
-  //               radius: 30,
-
-  //               backgroundImage:
-  //                   profilePhotoUrl != null
-  //                       ? NetworkImage(
-  //                           profilePhotoUrl!,
-  //                         )
-  //                       : null,
-
-  //               child:
-  //                   profilePhotoUrl == null
-  //                       ? const Icon(
-  //                           Icons.person,
-  //                           size: 30,
-  //                         )
-  //                       : null,
-  //             ),
-
-  //             const SizedBox(
-  //               width: 12,
-  //             ),
-
-  //             Expanded(
-  //               child: Column(
-  //                 mainAxisAlignment:
-  //                     MainAxisAlignment.center,
-  //                 crossAxisAlignment:
-  //                     CrossAxisAlignment.start,
-  //                 children: [
-  //                   Text(
-  //                     [
-  //                       userProfile?['first_name']
-  //                               ?.toString() ??
-  //                           '',
-  //                       userProfile?['last_name']
-  //                               ?.toString() ??
-  //                           '',
-  //                     ]
-  //                         .where(
-  //                           (name) =>
-  //                               name
-  //                                   .trim()
-  //                                   .isNotEmpty,
-  //                         )
-  //                         .join(' '),
-
-  //                     style:
-  //                         const TextStyle(
-  //                       fontSize: 18,
-  //                       fontWeight:
-  //                           FontWeight.bold,
-  //                     ),
-  //                   ),
-
-  //                   const SizedBox(
-  //                     height: 4,
-  //                   ),
-
-  //                   const Text(
-  //                     'View Profile',
-  //                   ),
-  //                 ],
-  //               ),
-  //             ),
-  //           ],
-  //         ),
-  //       ),
-  //     ),
-
-  // if (families.isNotEmpty)
-  // Padding(
-  //   padding: const EdgeInsets.fromLTRB(
-  //     16,
-  //     16,
-  //     16,
-  //     8,
-  //   ),
-  //   child: DropdownButtonFormField<String>(
-  //     initialValue: selectedFamilyId,
-  //     decoration: const InputDecoration(
-  //       labelText: 'Family',
-  //       prefixIcon: Icon(
-  //         Icons.family_restroom,
-  //       ),
-  //       border: OutlineInputBorder(),
-  //     ),
-  //     items: families.map(
-  //       (family) {
-  //         return DropdownMenuItem<String>(
-  //           value: family['id'].toString(),
-  //           child: Text(
-  //             family['family_name']
-  //                     ?.toString() ??
-  //                 'Unnamed Family',
-  //           ),
-  //         );
-  //       },
-  //     ).toList(),
-  //     onChanged: (familyId) {
-  //       if (familyId == null) {
-  //         return;
-  //       }
-
-  //       setState(() {
-  //         selectedFamilyId =
-  //             familyId;
-  //       });
-
-  //       Navigator.pop(context);
-
-  //       context.push(
-  //         '/family/$familyId',
-  //       );
-  //     },
-  //   ),
-  // ),
-  //           ListTile(
-  //             leading: const Icon(Icons.home),
-  //             title: const Text('Home'),
-  //             onTap: () {
-  //               // Navigate to the home page
-  //               Navigator.pop(context);
-  //               context.go('/app');
-  //             },
-  //           ),
-  //         //   ListTile(
-  //         //     leading: const Icon(Icons.notifications_outlined,),
-  //         //     title: const Text('Notifications',),
-  //         //     onTap: () {
-  //         //       Navigator.pop(context);
-  //         //       context.push('/notifications',);
-  //         //   },
-  //         // ),
-  //           ListTile(
-  //             leading: const Icon(Icons.person),
-  //             title: const Text('Profile'),
-  //             onTap: () async {
-  //         Navigator.of(context).pop();
-
-  //         await context.push(
-  //           '/profile',
-  //         );
-  //         loadUserProfile();
-  //             },
-  //           ),
-  //           ListTile(
-  //             leading: const Icon(Icons.settings),
-  //             title: const Text('Settings'),
-  //             onTap: () {
-  //               //Close the drawer before navigating to the settings page
-  //               Navigator.pop(context);
-  //               // Navigate to the settings page
-  //               context.push('/settings');
-  //             },
-  //           ),
-  //         ],
-  //       ),
-  //     ),
 
   bottomNavigationBar: BottomNavigationBar(
   type: BottomNavigationBarType.fixed,
@@ -1426,15 +2305,7 @@ Widget buildProfileHeader() {
 
       case 2:
         // Open the selected family.
-        final familyId = selectedFamilyId;
-
-        if (familyId != null) {
-          context.push(
-            '/family/$familyId',
-          );
-        } else {
-          showFamilyOptions();
-        }
+        context.push('/families');
         break;
 
       case 3:
@@ -1495,41 +2366,77 @@ Widget buildProfileHeader() {
 
       body: isLoading
           ? const Center(
-              child: CircularProgressIndicator(),
+              child: CircularProgressIndicator(
+                color: FolktriColors.primaryIndigo,
+              ),
             )
           : !hasApprovedFamily
               ? Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(28),
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.family_restroom, size: 64,),
+                          const Icon(
+                            Icons.family_restroom_rounded, 
+                            size: 64,
+                            color: FolktriColors.primaryIndigo
+                            ),
 
                           const SizedBox(height: 16,),
 
-                          const Text("Create a family or join an existing family to get started.",
+                          const Text("Create a family or join an existing family",
                             textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 22,
+                              color: FolktriColors.primaryText,
+                              fontWeight: FontWeight.bold,
+                            )
                           ),
 
                           const SizedBox(height: 20,),
 
-                          ElevatedButton.icon(
-                            onPressed: () async {
-                              setState(() {
-                                isLoading = true;
-                            });
+              //             ElevatedButton.icon(
+              //               onPressed: () async {
+              //                 setState(() {
+              //                   isLoading = true;
+              //               });
 
-                            await checkFamilyMembership();
+              //               await checkFamilyMembership();
 
-                            await Future.wait([
-                              loadFeed(),
-                              loadUpcomingEvents(),
-                            ]);
-                          },
-                icon: const Icon(Icons.refresh,),
-                label: const Text('Check for Family Access',),
-              ),
+              //               await Future.wait([
+              //                 loadFeed(),
+              //                 loadUpcomingEvents(),
+              //               ]);
+              //             },
+              //   icon: const Icon(Icons.refresh,),
+              //   label: const Text('Check for Family Access',),
+              // ),
+                                    ElevatedButton(
+                        onPressed: showFamilyOptions,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              FolktriColors.primaryIndigo,
+                          foregroundColor:
+                              FolktriColors.surface,
+                        ),
+                        child: const Text(
+                          'Get Started',
+                        ),
+                      ),
+
+                      TextButton(
+                        onPressed: () async {
+                          await checkFamilyMembership();
+                          await Future.wait([
+                            loadFeed(),
+                            loadUpcomingEvents(),
+                          ]);
+                        },
+                        child: const Text(
+                          'Check for Family Access',
+                        ),
+                      ),
             ],
           ),
         ),
@@ -1545,89 +2452,136 @@ Widget buildProfileHeader() {
                   ]);
                 },
                 child: ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 28),
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Upcoming',
-                        style:
-                          Theme.of(context).textTheme.titleLarge,
-                        ),
+    //                 Row(
+    //                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    //                   children: [
+    //                     Text('Upcoming',
+    //                     style:
+    //                       Theme.of(context).textTheme.titleLarge,
+    //                     ),
 
-        if (families.isNotEmpty)
-          TextButton(
-            onPressed: () {
-              final familyId = selectedFamilyId;
+    //     if (families.isNotEmpty)
+    //       TextButton(
+    //         onPressed: () {
+    //           final familyId = selectedFamilyId;
 
-              if (familyId == null) {
-                return;
-              }
+    //           if (familyId == null) {
+    //             return;
+    //           }
 
-              context.push('/family/$familyId/calendar',);
-            },
-            child:
-                const Text('View Calendar',),
-          ),
-      ],
-    ),
+    //           context.push('/family/$familyId/calendar',);
+    //         },
+    //         child:
+    //             const Text('View Calendar',),
+    //       ),
+    //   ],
+    // ),
 
-    const SizedBox(height: 8,),
+    // const SizedBox(height: 8,),
 
-    if (isLoadingEvents)
-      const Center(
-        child:
-            CircularProgressIndicator(),
-      )
-    else if (upcomingEvents.isEmpty)
-      const Padding(
-        padding:
-            EdgeInsets.symmetric(vertical: 24,),
-        child: Text('No upcoming events.',),
-      )
-    else
-      SizedBox(
-        height: 190,
-        child:
-            ListView.builder(
-          scrollDirection: Axis.horizontal,
-          itemCount: upcomingEvents.length,
-          itemBuilder:
-              (
-            context,
-            index,
-          ) {
-            final event = upcomingEvents[index];
+    // if (isLoadingEvents)
+    //   const Center(
+    //     child:
+    //         CircularProgressIndicator(),
+    //   )
+    // else if (upcomingEvents.isEmpty)
+    //   const Padding(
+    //     padding:
+    //         EdgeInsets.symmetric(vertical: 24,),
+    //     child: Text('No upcoming events.',),
+    //   )
+    // else
+    //   SizedBox(
+    //     height: 190,
+    //     child:
+    //         ListView.builder(
+    //       scrollDirection: Axis.horizontal,
+    //       itemCount: upcomingEvents.length,
+    //       itemBuilder:
+    //           (
+    //         context,
+    //         index,
+    //       ) {
+    //         final event = upcomingEvents[index];
 
-            return buildUpcomingEventCard(
-              event,
-            );
-          },
-        ),
-      ),
+    //         return buildUpcomingEventCard(
+    //           event,
+    //         );
+    //       },
+    //     ),
+    //   ),
 
-    const SizedBox(height: 24,),
+    buildFamilySelector(),
+
+    const SizedBox(height: 12),
+
+    buildQuickPostCard(),
+
+    const SizedBox(height: 18,),
+
+    buildTodaySection(),
+
+    const SizedBox(height: 22,),
 
     Text('Family Feed',
       style:
-          Theme.of(context).textTheme.titleLarge,
+          TextStyle(
+            color: FolktriColors.primaryText,
+            fontSize: 19,
+            fontWeight: FontWeight.bold,
+          ),
     ),
 
     const SizedBox(height: 12,),
 
     if (isLoadingFeed)
-      const Center(
-        child:
-            CircularProgressIndicator(),
-      )
-    else if (feedItems.isEmpty)
       const Padding(
-        padding:
-            EdgeInsets.symmetric(vertical: 40,),
+        padding: EdgeInsets.all(24),
         child: Center(
-          child: Text('No family activity yet.',),
+           child: CircularProgressIndicator(
+            color: FolktriColors.primaryIndigo,
+            ),
+          ),
+        )
+    else if (feedItems.isEmpty)
+      Container( 
+        
+        padding: EdgeInsets.all(24,),
+        decoration: BoxDecoration(
+          color: FolktriColors.surface,
+          borderRadius: BorderRadius.circular(18),
         ),
-      )
+        child: const Column(
+          children: [
+            Icon(
+              Icons.favorite_border_rounded,
+              size: 38,
+              color:FolktriColors.primaryIndigo,
+            ),
+
+            SizedBox(height: 12,),
+
+            Text('No family activity yet.',
+              style: TextStyle(
+                color: FolktriColors.primaryText,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            SizedBox(height: 6,),
+
+            Text('Share a moment with your family to get started!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: FolktriColors.secondaryText,
+              ),
+            ),
+          ],
+        )
+      
+      )   
     else
       ...feedItems.map(
         (item) {

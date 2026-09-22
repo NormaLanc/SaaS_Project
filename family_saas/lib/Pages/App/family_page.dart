@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../Styling/folktri_colors.dart';
 
 class FamilyPage extends StatefulWidget {
   final String familyId;
@@ -155,7 +156,7 @@ class _FamilyPageState extends State<FamilyPage> {
       ),
     );
 
-    context.go('/app');
+    context.go('/families');
   } catch (e) {
     if (!mounted) return;
 
@@ -182,16 +183,21 @@ class _FamilyPageState extends State<FamilyPage> {
 
     if (family == null) {
       return Scaffold(
+        backgroundColor: FolktriColors.background,
+
         appBar: AppBar(
+          backgroundColor: FolktriColors.midnightIndigo,
+          foregroundColor: FolktriColors.surface,
+          elevation: 0,
           automaticallyImplyLeading: false,
 
           leading: IconButton(
           icon: const Icon(
-            Icons.arrow_back,
+            Icons.arrow_back_ios_new_rounded,
           ),
           tooltip: 'Back to Family Dashboard',
           onPressed: () {
-            context.go('/app');
+            context.go('/families');
           },
         ),
       ),
@@ -216,19 +222,29 @@ class _FamilyPageState extends State<FamilyPage> {
         currentUser.id;
 
     return Scaffold(
+      backgroundColor: FolktriColors.background,
+
       appBar: AppBar(
+        backgroundColor: FolktriColors.midnightIndigo,
+        foregroundColor: FolktriColors.surface,
+        elevation: 0,
         automaticallyImplyLeading: false,
 
         leading: IconButton(
           icon: const Icon(
-            Icons.arrow_back,
+            Icons.arrow_back_ios_new_rounded,
           ),
         tooltip: 'Back to Family Dashboard',
         onPressed: () {
-          context.go('/app');
+          context.go('/families');
         },
       ),
-        title: Text(familyName),
+        title: Text(
+          familyName,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
 
         actions: [
           if (isFamilyOwner)
@@ -245,7 +261,7 @@ class _FamilyPageState extends State<FamilyPage> {
 
           child: Row(
             children: [
-              Icon(Icons.delete_forever,),
+              Icon(Icons.delete_forever_outlined,),
               SizedBox(width: 8,),
               Text('Delete Family',),
                   ],
@@ -396,6 +412,15 @@ class _FamilyPageState extends State<FamilyPage> {
                       .join(' ');
 
                   return Card(
+                      color: FolktriColors.surface,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      side: const BorderSide(
+                        color: FolktriColors.lightLavender,
+                      ),
+                    ),
+                    
                     child: ListTile(
                       leading: CircleAvatar(
                         backgroundImage:

@@ -22,6 +22,7 @@ import '../Pages/App/Documents/add_document.dart';
 import '../Pages/App/Notifications/notifications.dart';
 import '../Pages/App/intro_page.dart';
 import '../Pages/splash_page.dart';
+import '../Pages/App/families_page.dart';
 
 final GoRouter appRouter = GoRouter(
   // initialLocation: kIsWeb ? '/' : '/welcome',
@@ -228,6 +229,11 @@ GoRoute(
 
   builder: (context, state) =>
       const SplashPage(),
+),
+GoRoute(
+  path: '/families',
+  builder: (context, state) =>
+      const FamiliesPage(),
 ),
   ],
 );
