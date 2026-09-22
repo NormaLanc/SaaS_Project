@@ -20,9 +20,11 @@ import '../Pages/App/Calendar/family_calendar.dart';
 import '../Pages/App/Calendar/add_event.dart';
 import '../Pages/App/Documents/add_document.dart';
 import '../Pages/App/Notifications/notifications.dart';
+import '../Pages/App/intro_page.dart';
 
 final GoRouter appRouter = GoRouter(
-  initialLocation: kIsWeb ? '/' : '/login',
+  initialLocation: kIsWeb ? '/' : '/welcome',
+  // initialLocation: kIsWeb ? '/' : '/login',
 
   redirect: (context, state) {
     final session = Supabase.instance.client.auth.currentSession;
@@ -37,14 +39,15 @@ final GoRouter appRouter = GoRouter(
     final isPublicPage =
         path == '/' ||
         path == '/login' ||
-        path == '/register';
+        path == '/register' ||
+        path == '/welcome';
 
     if (!isLoggedIn && !isPublicPage) {
       return '/login';
     }
 
     if (isLoggedIn &&
-        (path == '/login' || path == '/register')) {
+        (path == '/login' || path == '/register' || path == '/welcome')) {
       return '/app';
     }
 
@@ -206,6 +209,11 @@ GoRoute(
           childId,
     );
   },
+),
+GoRoute(
+  path: '/welcome',
+  builder: (context, state) =>
+      const IntroductionPage(),
 ),
   ],
 );

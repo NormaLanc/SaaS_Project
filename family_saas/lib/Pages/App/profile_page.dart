@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../Styling/folktri_colors.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -368,6 +369,23 @@ class _ProfilePageState extends State<ProfilePage> {
       },
     ),
         title: const Text('Profile'),
+        backgroundColor: FolktriColors.midnightIndigo,
+
+  foregroundColor: FolktriColors.surface,
+
+  actions: [
+    IconButton(
+      icon: const Icon(
+        Icons.settings_outlined,
+      ),
+
+      tooltip: 'Settings',
+
+      onPressed: () {
+        context.push('/settings');
+      },
+    ),
+  ],
       ),
       body: isLoading
               ? const Center(

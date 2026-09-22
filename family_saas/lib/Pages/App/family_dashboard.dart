@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../Styling/folktri_colors.dart';
 
 
 
@@ -1167,194 +1168,330 @@ Widget buildProfileHeader() {
 
       
       appBar: AppBar(
-        title: const Text("Family Dashboard"),
+        backgroundColor: FolktriColors.midnightIndigo,
+        title: const Text("Folktri", 
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: FolktriColors.surface
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: const Icon(
+              Icons.add,
+              color: FolktriColors.surface,
+              ),
             tooltip: "Add Family",
             onPressed: showFamilyOptions,
           ),
+          IconButton(
+            icon: const Icon(
+              Icons.notifications_outlined,
+              color: FolktriColors.surface
+              ),
+            tooltip: "Notifications",
+            onPressed: () {
+              context.push('/notifications',);
+            },
+          ),  
           // buildProfileHeader(),
           // const SizedBox(width: 8,),
         ],
       ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-                  DrawerHeader(
-        child: InkWell(
-          onTap: () async {
-            Navigator.of(context).pop();
+  //     drawer: Drawer(
+  //       child: ListView(
+  //         padding: EdgeInsets.zero,
+  //         children: [
+  //                 DrawerHeader(
+  //       child: InkWell(
+  //         onTap: () async {
+  //           Navigator.of(context).pop();
 
-            await context.push(
-              '/profile',
-            );
+  //           await context.push(
+  //             '/profile',
+  //           );
 
-            loadUserProfile();
-          },
+  //           loadUserProfile();
+  //         },
 
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 30,
+  //         child: Row(
+  //           children: [
+  //             CircleAvatar(
+  //               radius: 30,
 
-                backgroundImage:
-                    profilePhotoUrl != null
-                        ? NetworkImage(
-                            profilePhotoUrl!,
-                          )
-                        : null,
+  //               backgroundImage:
+  //                   profilePhotoUrl != null
+  //                       ? NetworkImage(
+  //                           profilePhotoUrl!,
+  //                         )
+  //                       : null,
 
-                child:
-                    profilePhotoUrl == null
-                        ? const Icon(
-                            Icons.person,
-                            size: 30,
-                          )
-                        : null,
-              ),
+  //               child:
+  //                   profilePhotoUrl == null
+  //                       ? const Icon(
+  //                           Icons.person,
+  //                           size: 30,
+  //                         )
+  //                       : null,
+  //             ),
 
-              const SizedBox(
-                width: 12,
-              ),
+  //             const SizedBox(
+  //               width: 12,
+  //             ),
 
-              Expanded(
-                child: Column(
-                  mainAxisAlignment:
-                      MainAxisAlignment.center,
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      [
-                        userProfile?['first_name']
-                                ?.toString() ??
-                            '',
-                        userProfile?['last_name']
-                                ?.toString() ??
-                            '',
-                      ]
-                          .where(
-                            (name) =>
-                                name
-                                    .trim()
-                                    .isNotEmpty,
-                          )
-                          .join(' '),
+  //             Expanded(
+  //               child: Column(
+  //                 mainAxisAlignment:
+  //                     MainAxisAlignment.center,
+  //                 crossAxisAlignment:
+  //                     CrossAxisAlignment.start,
+  //                 children: [
+  //                   Text(
+  //                     [
+  //                       userProfile?['first_name']
+  //                               ?.toString() ??
+  //                           '',
+  //                       userProfile?['last_name']
+  //                               ?.toString() ??
+  //                           '',
+  //                     ]
+  //                         .where(
+  //                           (name) =>
+  //                               name
+  //                                   .trim()
+  //                                   .isNotEmpty,
+  //                         )
+  //                         .join(' '),
 
-                      style:
-                          const TextStyle(
-                        fontSize: 18,
-                        fontWeight:
-                            FontWeight.bold,
-                      ),
-                    ),
+  //                     style:
+  //                         const TextStyle(
+  //                       fontSize: 18,
+  //                       fontWeight:
+  //                           FontWeight.bold,
+  //                     ),
+  //                   ),
 
-                    const SizedBox(
-                      height: 4,
-                    ),
+  //                   const SizedBox(
+  //                     height: 4,
+  //                   ),
 
-                    const Text(
-                      'View Profile',
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+  //                   const Text(
+  //                     'View Profile',
+  //                   ),
+  //                 ],
+  //               ),
+  //             ),
+  //           ],
+  //         ),
+  //       ),
+  //     ),
 
-  if (families.isNotEmpty)
-  Padding(
-    padding: const EdgeInsets.fromLTRB(
-      16,
-      16,
-      16,
-      8,
-    ),
-    child: DropdownButtonFormField<String>(
-      initialValue: selectedFamilyId,
-      decoration: const InputDecoration(
-        labelText: 'Family',
-        prefixIcon: Icon(
-          Icons.family_restroom,
-        ),
-        border: OutlineInputBorder(),
-      ),
-      items: families.map(
-        (family) {
-          return DropdownMenuItem<String>(
-            value: family['id'].toString(),
-            child: Text(
-              family['family_name']
-                      ?.toString() ??
-                  'Unnamed Family',
-            ),
-          );
-        },
-      ).toList(),
-      onChanged: (familyId) {
-        if (familyId == null) {
-          return;
-        }
+  // if (families.isNotEmpty)
+  // Padding(
+  //   padding: const EdgeInsets.fromLTRB(
+  //     16,
+  //     16,
+  //     16,
+  //     8,
+  //   ),
+  //   child: DropdownButtonFormField<String>(
+  //     initialValue: selectedFamilyId,
+  //     decoration: const InputDecoration(
+  //       labelText: 'Family',
+  //       prefixIcon: Icon(
+  //         Icons.family_restroom,
+  //       ),
+  //       border: OutlineInputBorder(),
+  //     ),
+  //     items: families.map(
+  //       (family) {
+  //         return DropdownMenuItem<String>(
+  //           value: family['id'].toString(),
+  //           child: Text(
+  //             family['family_name']
+  //                     ?.toString() ??
+  //                 'Unnamed Family',
+  //           ),
+  //         );
+  //       },
+  //     ).toList(),
+  //     onChanged: (familyId) {
+  //       if (familyId == null) {
+  //         return;
+  //       }
 
-        setState(() {
-          selectedFamilyId =
-              familyId;
-        });
+  //       setState(() {
+  //         selectedFamilyId =
+  //             familyId;
+  //       });
 
-        Navigator.pop(context);
+  //       Navigator.pop(context);
 
-        context.push(
-          '/family/$familyId',
-        );
-      },
-    ),
+  //       context.push(
+  //         '/family/$familyId',
+  //       );
+  //     },
+  //   ),
+  // ),
+  //           ListTile(
+  //             leading: const Icon(Icons.home),
+  //             title: const Text('Home'),
+  //             onTap: () {
+  //               // Navigate to the home page
+  //               Navigator.pop(context);
+  //               context.go('/app');
+  //             },
+  //           ),
+  //         //   ListTile(
+  //         //     leading: const Icon(Icons.notifications_outlined,),
+  //         //     title: const Text('Notifications',),
+  //         //     onTap: () {
+  //         //       Navigator.pop(context);
+  //         //       context.push('/notifications',);
+  //         //   },
+  //         // ),
+  //           ListTile(
+  //             leading: const Icon(Icons.person),
+  //             title: const Text('Profile'),
+  //             onTap: () async {
+  //         Navigator.of(context).pop();
+
+  //         await context.push(
+  //           '/profile',
+  //         );
+  //         loadUserProfile();
+  //             },
+  //           ),
+  //           ListTile(
+  //             leading: const Icon(Icons.settings),
+  //             title: const Text('Settings'),
+  //             onTap: () {
+  //               //Close the drawer before navigating to the settings page
+  //               Navigator.pop(context);
+  //               // Navigate to the settings page
+  //               context.push('/settings');
+  //             },
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+
+  bottomNavigationBar: BottomNavigationBar(
+  type: BottomNavigationBarType.fixed,
+
+  backgroundColor: FolktriColors.surface,
+
+  selectedItemColor: FolktriColors.primaryIndigo,
+
+  unselectedItemColor: FolktriColors.secondaryText,
+
+  selectedLabelStyle: const TextStyle(
+    fontWeight: FontWeight.w600,
+    fontSize: 12,
   ),
-            ListTile(
-              leading: const Icon(Icons.home),
-              title: const Text('Home'),
-              onTap: () {
-                // Navigate to the home page
-                Navigator.pop(context);
-                context.go('/app');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.notifications_outlined,),
-              title: const Text('Notifications',),
-              onTap: () {
-                Navigator.pop(context);
-                context.push('/notifications',);
-            },
-          ),
-            ListTile(
-              leading: const Icon(Icons.person),
-              title: const Text('Profile'),
-              onTap: () async {
-          Navigator.of(context).pop();
 
-          await context.push(
-            '/profile',
+  unselectedLabelStyle: const TextStyle(
+    fontSize: 12,
+  ),
+
+  showSelectedLabels: true,
+  showUnselectedLabels: true,
+
+  currentIndex: 0,
+
+  onTap: (index) {
+    switch (index) {
+      case 0:
+        // Already on the Family Dashboard.
+        break;
+
+      case 1:
+        // Open the selected family's calendar.
+        final familyId = selectedFamilyId;
+
+        if (familyId != null) {
+          context.push(
+            '/family/$familyId/calendar',
           );
-          loadUserProfile();
-              },
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Please create or join a family first.',
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.settings),
-              title: const Text('Settings'),
-              onTap: () {
-                //Close the drawer before navigating to the settings page
-                Navigator.pop(context);
-                // Navigate to the settings page
-                context.push('/settings');
-              },
+          );
+        }
+        break;
+
+      case 2:
+        // Open the selected family.
+        final familyId = selectedFamilyId;
+
+        if (familyId != null) {
+          context.push(
+            '/family/$familyId',
+          );
+        } else {
+          showFamilyOptions();
+        }
+        break;
+
+      case 3:
+        // Open family albums.
+        // Add this route when your Albums page is ready.
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Family Albums is coming soon!',
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+        break;
+
+      case 4:
+        // Open the user's profile.
+        context.push('/profile').then((_) {
+          if (mounted) {
+            loadUserProfile();
+          }
+        });
+        break;
+    }
+  },
+
+  items: const [
+    BottomNavigationBarItem(
+      icon: Icon(Icons.home_outlined),
+      activeIcon: Icon(Icons.home),
+      label: 'Home',
+    ),
+
+    BottomNavigationBarItem(
+      icon: Icon(Icons.calendar_month_outlined),
+      activeIcon: Icon(Icons.calendar_month),
+      label: 'Calendar',
+    ),
+
+    BottomNavigationBarItem(
+      icon: Icon(Icons.family_restroom_outlined),
+      activeIcon: Icon(Icons.family_restroom),
+      label: 'Family',
+    ),
+
+    BottomNavigationBarItem(
+      icon: Icon(Icons.photo_library_outlined),
+      activeIcon: Icon(Icons.photo_library),
+      label: 'Albums',
+    ),
+
+    BottomNavigationBarItem(
+      icon: Icon(Icons.person_outline),
+      activeIcon: Icon(Icons.person),
+      label: 'Profile',
+    ),
+  ],
+),
 
       body: isLoading
           ? const Center(

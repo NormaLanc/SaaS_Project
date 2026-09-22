@@ -182,7 +182,19 @@ class _FamilyPageState extends State<FamilyPage> {
 
     if (family == null) {
       return Scaffold(
-        appBar: AppBar(),
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+
+          leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back,
+          ),
+          tooltip: 'Back to Family Dashboard',
+          onPressed: () {
+            context.go('/app');
+          },
+        ),
+      ),
         body: const Center(
           child: Text(
             "Family could not be found.",
@@ -205,6 +217,17 @@ class _FamilyPageState extends State<FamilyPage> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back,
+          ),
+        tooltip: 'Back to Family Dashboard',
+        onPressed: () {
+          context.go('/app');
+        },
+      ),
         title: Text(familyName),
 
         actions: [
