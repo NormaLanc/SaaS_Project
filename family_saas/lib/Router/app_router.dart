@@ -21,10 +21,13 @@ import '../Pages/App/Calendar/add_event.dart';
 import '../Pages/App/Documents/add_document.dart';
 import '../Pages/App/Notifications/notifications.dart';
 import '../Pages/App/intro_page.dart';
+import '../Pages/splash_page.dart';
 
 final GoRouter appRouter = GoRouter(
-  initialLocation: kIsWeb ? '/' : '/welcome',
+  // initialLocation: kIsWeb ? '/' : '/welcome',
   // initialLocation: kIsWeb ? '/' : '/login',
+   initialLocation: kIsWeb ? '/' : '/splash',
+
 
   redirect: (context, state) {
     final session = Supabase.instance.client.auth.currentSession;
@@ -38,16 +41,21 @@ final GoRouter appRouter = GoRouter(
 
     final isPublicPage =
         path == '/' ||
+        path == '/splash' || 
+        path == '/welcome' ||
         path == '/login' ||
-        path == '/register' ||
-        path == '/welcome';
+        path == '/register';
 
     if (!isLoggedIn && !isPublicPage) {
+      debugPrint('ROUTER: Redirecting to /login');
       return '/login';
     }
 
     if (isLoggedIn &&
-        (path == '/login' || path == '/register' || path == '/welcome')) {
+        (path == '/welcome' ||
+          path == '/login' || 
+        path == '/register')) {
+          debugPrint('ROUTER: Redirecting to /app');
       return '/app';
     }
 
@@ -214,6 +222,12 @@ GoRoute(
   path: '/welcome',
   builder: (context, state) =>
       const IntroductionPage(),
+),
+GoRoute(
+  path: '/splash',
+
+  builder: (context, state) =>
+      const SplashPage(),
 ),
   ],
 );

@@ -45,25 +45,13 @@ class IntroductionPage extends StatelessWidget {
                           // FOLKTRI BRANDING
                           // =========================
 
-                          Container(
-                            width: 76,
-                            height: 76,
+                          Image.asset(
+                            'assets/images/Folktri_Icon_Indigo.png',
 
-                            decoration: BoxDecoration(
-                              color:
-                                  FolktriColors.midnightIndigo,
+                            width: 90,
+                            height: 100,
 
-                              borderRadius:
-                                  BorderRadius.circular(24),
-                            ),
-
-                            child: const Icon(
-                              Icons.family_restroom_rounded,
-
-                              color: FolktriColors.surface,
-
-                              size: 40,
-                            ),
+                            fit: BoxFit.contain,
                           ),
 
                           const SizedBox(height: 16),
