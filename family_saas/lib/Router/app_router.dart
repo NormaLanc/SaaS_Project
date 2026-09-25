@@ -23,6 +23,7 @@ import '../Pages/App/Notifications/notifications.dart';
 import '../Pages/App/intro_page.dart';
 import '../Pages/splash_page.dart';
 import '../Pages/App/families_page.dart';
+import '../Pages/App/family_timeline.dart';
 
 final GoRouter appRouter = GoRouter(
   // initialLocation: kIsWeb ? '/' : '/welcome',
@@ -111,6 +112,18 @@ final GoRouter appRouter = GoRouter(
         state.pathParameters['familyId']!;
 
     return FamilyPage(
+      familyId: familyId,
+    );
+  },
+),
+GoRoute(
+  path: '/family/:familyId/timeline',
+
+  builder: (context, state) {
+    final familyId =
+        state.pathParameters['familyId']!;
+
+    return FamilyTimelinePage(
       familyId: familyId,
     );
   },

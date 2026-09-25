@@ -318,15 +318,15 @@ class _FamiliesPageState extends State<FamiliesPage> {
             color: FolktriColors.surface,
           ),
         ),
-        leading: IconButton(
-          tooltip: 'Back to dashboard',
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-          ),
-          onPressed: () {
-            context.go('/app');
-          },
-        ),
+        // leading: IconButton(
+        //   tooltip: 'Back to dashboard',
+        //   icon: const Icon(
+        //     Icons.arrow_back_ios_new_rounded,
+        //   ),
+        //   onPressed: () {
+        //     context.go('/app');
+        //   },
+        // ),
       ),
 
       body: RefreshIndicator(
