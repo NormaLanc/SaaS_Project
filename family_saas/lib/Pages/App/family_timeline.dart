@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-//import 'package:google_fonts/google_fonts.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../Styling/folktri_colors.dart';
+//import 'package:flutter/services.dart';
 
 //This page contains all the data for the specific family selected.
 
@@ -28,10 +29,13 @@ class _FamilyTimelinePageState
   List<Map<String, dynamic>> photos = [];
   List<Map<String, dynamic>> milestones = [];
   List<Map<String, dynamic>> events = [];
+  List<Map<String, dynamic>> children = [];
 
   bool isLoading = true;
 
   String selectedFilter = 'all';
+
+  static const Color timelineBackground = Color(0xFFF7F4F8);
 
   @override
   void initState() {
@@ -76,13 +80,17 @@ class _FamilyTimelinePageState
 
       final childrenResponse = await supabase
           .from('Children')
-          .select('id')
+          .select('id, first_name, middle_name, last_name')
           .eq(
             'family_id',
             widget.familyId,
-          );
+          ).order('first_name');
 
-      final childIds = childrenResponse
+      final loadedChildren = List<Map<String, dynamic>>.from(
+        childrenResponse,
+      );
+
+      final childIds = loadedChildren
           .map(
             (child) =>
                 child['id']?.toString(),
@@ -159,6 +167,8 @@ class _FamilyTimelinePageState
             Map<String, dynamic>.from(
           familyResponse,
         );
+
+        children = loadedChildren;
 
         photos = loadedPhotos;
         milestones = loadedMilestones;
@@ -498,6 +508,138 @@ class _FamilyTimelinePageState
   return null;
 }
 
+String getChildName(
+  String? childId,
+) {
+  if (childId == null ||
+      childId.isEmpty) {
+    return 'Family';
+  }
+
+  final matchingChildren =
+      children.where(
+    (child) =>
+        child['id']?.toString() ==
+        childId,
+  );
+
+  if (matchingChildren.isEmpty) {
+    return 'Family';
+  }
+
+  final child =
+      matchingChildren.first;
+
+  final firstName =
+      child['first_name']
+          ?.toString()
+          .trim() ??
+      '';
+
+  final middleName =
+      child['middle_name']
+          ?.toString()
+          .trim() ??
+      '';
+
+  final lastName =
+      child['last_name']
+          ?.toString()
+          .trim() ??
+      '';
+
+  final fullName = [
+    firstName,
+    middleName,
+    lastName,
+  ]
+      .where(
+        (name) =>
+            name.isNotEmpty,
+      )
+      .join(' ');
+
+  if (fullName.isEmpty) {
+    return 'Family';
+  }
+
+  return firstName.isNotEmpty
+      ? firstName
+      : fullName;
+}
+
+  bool isFamilyActivity(String? childId) {
+    return childId == null ||
+      childId.isEmpty;
+  }
+
+  Widget buildActivityPersonChip(
+  String? childId,
+) {
+  final isFamily =
+      isFamilyActivity(childId);
+
+  final label =
+      getChildName(childId);
+
+  return Container(
+    padding:
+        const EdgeInsets.symmetric(
+      horizontal: 9,
+      vertical: 5,
+    ),
+    decoration: BoxDecoration(
+      color: isFamily
+          ? FolktriColors.connectionTeal
+              .withOpacity(0.10)
+          : FolktriColors.lightLavender,
+
+      borderRadius:
+          BorderRadius.circular(20),
+    ),
+    child: Row(
+      mainAxisSize:
+          MainAxisSize.min,
+      children: [
+        Icon(
+          isFamily
+              ? Icons
+                  .family_restroom_rounded
+              : Icons
+                  .child_care_rounded,
+
+          size: 13,
+
+          color: isFamily
+              ? FolktriColors.connectionTeal
+              : FolktriColors.primaryIndigo,
+        ),
+
+        const SizedBox(
+          width: 4,
+        ),
+
+        Text(
+          label,
+
+          style: TextStyle(
+            fontSize: 11,
+
+            fontWeight:
+                FontWeight.w700,
+
+            color: isFamily
+                ? FolktriColors.connectionTeal
+                : FolktriColors.primaryIndigo,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+
+
   // =========================================================
   // TIMELINE ITEM
   // =========================================================
@@ -509,6 +651,8 @@ class _FamilyTimelinePageState
     final data = Map<String, dynamic>.from(item['data'],);
 
     final date = item['date'] as DateTime;
+
+    final childId = data['child_id']?.toString();
 
     final imageUrl = getActivityImageUrl(type, data,);
 
@@ -722,40 +866,69 @@ class _FamilyTimelinePageState
                           children: [
                             Expanded(
                               child: Text(
-                                typeLabel,
+                                typeLabel.toUpperCase(),
 
                                 style: TextStyle(
                                   color: color,
 
-                                  fontSize: 11,
+                                  fontSize: 10,
 
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w800,
+
+                                  letterSpacing: 0.7,
                                 ),
                               ),
                             ),
 
                             Text(
                               formatActivityDate(date,),
+
                               style: const TextStyle(
-                                color: FolktriColors.secondaryText,
+                                color:FolktriColors.secondaryText,
+
                                 fontSize: 11,
                               ),
                             ),
                           ],
                         ),
 
-                        const SizedBox(height: 5,),
+                      const SizedBox(height: 7,),
 
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            color: FolktriColors.primaryText,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+      // -----------------------------------------
+      // CHILD / FAMILY CHIP
+      // -----------------------------------------
 
-                        buildActivityDetails(type, data, date,),
+      buildActivityPersonChip(childId,),
+
+      const SizedBox(height: 8,),
+
+      // -----------------------------------------
+      // TITLE
+      // -----------------------------------------
+
+      Text(
+        title,
+
+        maxLines: 2,
+
+        overflow: TextOverflow.ellipsis,
+
+        style: const TextStyle(
+          color:FolktriColors.primaryText,
+
+          fontSize: 15,
+
+          fontWeight: FontWeight.w700,
+
+          height: 1.25,
+        ),
+      ),
+
+      // -----------------------------------------
+      // DESCRIPTION / EVENT DETAILS
+      // -----------------------------------------
+
+      buildActivityDetails(type, data, date,),
                       ],
                     ),
                   ),
@@ -1198,6 +1371,115 @@ class _FamilyTimelinePageState
     ).format(context);
   }
 
+Widget buildTimelineHeader() {
+  final familyName =
+      family?['family_name']?.toString().trim();
+
+  final displayName =
+      familyName != null && familyName.isNotEmpty
+          ? familyName
+          : 'Family';
+
+   return SizedBox(
+    width: double.infinity,
+    height: 210,
+    child: Stack(
+      children: [
+        // -----------------------------------------
+        // FULL-WIDTH BOTANICAL BACKGROUND
+        // -----------------------------------------
+
+        Positioned.fill(
+          child: Image.asset(
+            'assets/images/FT_Header.png',
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+          ),
+        ),
+
+        // -----------------------------------------
+        // VERY SUBTLE CENTER FADE
+        // -----------------------------------------
+
+        Positioned.fill(
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  timelineBackground.withOpacity(0.00),
+                  timelineBackground.withOpacity(0.12),
+                  timelineBackground.withOpacity(0.28),
+                  timelineBackground.withOpacity(0.28),
+                  timelineBackground.withOpacity(0.12),
+                  timelineBackground.withOpacity(0.00),
+                ],
+                stops: const [
+                  0.0,
+                  0.20,
+                  0.38,
+                  0.62,
+                  0.80,
+                  1.0,
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // -----------------------------------------
+        // FAMILY NAME
+        // -----------------------------------------
+
+        Positioned.fill(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 50,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    displayName,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.marckScript(
+                      color:
+                          FolktriColors.midnightIndigo,
+                      fontSize: 40,
+                      fontWeight: FontWeight.w700,
+                      height: 1.05,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Text(
+                  //   'FAMILY TIMELINE',
+                  //   textAlign: TextAlign.center,
+                  //   style: TextStyle(
+                  //     color: FolktriColors
+                  //         .midnightIndigo
+                  //         .withOpacity(0.60),
+                  //     fontSize: 10,
+                  //     fontWeight: FontWeight.w600,
+                  //     letterSpacing: 2.8,
+                  //   ),
+                  // ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
   // =========================================================
   // BUILD
   // =========================================================
@@ -1206,19 +1488,19 @@ class _FamilyTimelinePageState
   Widget build(
     BuildContext context,
   ) {
-    final familyName =
-        family?['family_name']
-                ?.toString() ??
-            'Family';
+    // final familyName =
+    //     family?['family_name']
+    //             ?.toString() ??
+    //         'Family';
 
     final groupedActivity =
         groupActivityByMonth();
 
     return Scaffold(
-      backgroundColor: FolktriColors.background,
+      backgroundColor: timelineBackground,
 
       appBar: AppBar(
-        backgroundColor: FolktriColors.background,
+        backgroundColor: timelineBackground,
 
         // foregroundColor:
         //     FolktriColors.midnightIndigo,
@@ -1265,62 +1547,49 @@ class _FamilyTimelinePageState
               onRefresh: loadTimeline,
 
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 40,),
+                padding: EdgeInsets.zero,
 
                 children: [
                   // -----------------------------------------
                   // PAGE HEADER
                   // -----------------------------------------
+                  buildTimelineHeader(),
 
-                  Text(
-                    familyName,
-
-                    textAlign: TextAlign.center,
-
-                    style: const TextStyle(
-                      color: FolktriColors.midnightIndigo,
-
-                      fontSize: 23,
-
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-
-                  const SizedBox( height: 4,),
-
-                  const Text(
-                    'Family Timeline',
-
-                    textAlign: TextAlign.center,
-
-                    style: TextStyle(
-                      color: FolktriColors.secondaryText,
-                      fontSize: 14,
-                    ),
-                  ),
-
-                  const SizedBox(height: 20,),
+                  const SizedBox(height: 18,),
 
                   // -----------------------------------------
                   // FILTERS
                   // -----------------------------------------
 
-                  buildFilterBar(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric( horizontal: 16,),
+      
+                    child: buildFilterBar(),
+                  ),
 
                   const SizedBox(height: 20,),
+
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB( 16,0, 16,40,),
 
                   // -----------------------------------------
                   // TIMELINE
                   // -----------------------------------------
-
-                  if (groupedActivity.isEmpty)
-                    buildEmptyState()
-                  else
-                    ...groupedActivity.entries.map(
-                      (entry) =>
-                          buildMonthSection(entry.key, entry.value,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (groupedActivity.isEmpty)
+                          buildEmptyState()
+                        else
+                          ...groupedActivity.entries.map(
+                          (entry) => buildMonthSection(
+                            entry.key,
+                            entry.value,
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
                 ],
               ),
             ),

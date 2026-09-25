@@ -74,6 +74,7 @@ flutter:
     - assets/images/Folktri_App_Icon.png
     - assets/images/Folktri_Icon_Indigo.png
     - assets/images/Folktri_Icon_White.png
+    - assets/images/FT_Header.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
