@@ -419,6 +419,110 @@ class _FamiliesPageState extends State<FamiliesPage> {
         icon: const Icon(Icons.add_rounded),
         label: const Text('Create or Join'),
       ),
+
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 2, // Calendar
+
+        type: BottomNavigationBarType.fixed,
+
+        backgroundColor: FolktriColors.surface,
+
+        selectedItemColor:FolktriColors.primaryIndigo,
+
+        unselectedItemColor: FolktriColors.secondaryText,
+
+        selectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 11,
+        ),
+
+        unselectedLabelStyle: const TextStyle(
+          fontSize: 11,
+        ),
+
+        onTap: (index) {
+          switch (index) {
+            // HOME
+            case 0:
+              context.go('/app');
+              break;
+
+            // CALENDAR
+            case 1:
+              // Already on Calendar.
+              context.go('/family/:familyId/calendar');
+              break;
+
+            // FAMILY
+            case 2:
+              // Already on family page.
+              break;
+
+            // ALBUMS
+            case 3:
+              // We'll connect this when
+              // Family Albums is built.
+              break;
+
+            // PROFILE
+            case 4:
+              context.go('/profile');
+              break;
+          }
+        },
+
+  items: const [
+    BottomNavigationBarItem(
+      icon: Icon(
+        Icons.home_outlined,
+      ),
+      activeIcon: Icon(
+        Icons.home_rounded,
+      ),
+      label: 'Home',
+    ),
+
+    BottomNavigationBarItem(
+      icon: Icon(
+        Icons.calendar_month_outlined,
+      ),
+      activeIcon: Icon(
+        Icons.calendar_month_rounded,
+      ),
+      label: 'Calendar',
+    ),
+
+    BottomNavigationBarItem(
+      icon: Icon(
+        Icons.family_restroom_outlined,
+      ),
+      activeIcon: Icon(
+        Icons.family_restroom_rounded,
+      ),
+      label: 'Family',
+    ),
+
+    BottomNavigationBarItem(
+      icon: Icon(
+        Icons.photo_library_outlined,
+      ),
+      activeIcon: Icon(
+        Icons.photo_library_rounded,
+      ),
+      label: 'Albums',
+    ),
+
+    BottomNavigationBarItem(
+      icon: Icon(
+        Icons.person_outline_rounded,
+      ),
+      activeIcon: Icon(
+        Icons.person_rounded,
+      ),
+      label: 'Profile',
+    ),
+  ],
+),
     );
   }
 }
