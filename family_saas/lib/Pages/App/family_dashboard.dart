@@ -2289,7 +2289,7 @@ Widget _todayCard({
         final familyId = selectedFamilyId;
 
         if (familyId != null) {
-          context.push(
+          context.go(
             '/family/$familyId/calendar',
           );
         } else {
@@ -2305,7 +2305,7 @@ Widget _todayCard({
 
       case 2:
         // Open the selected family.
-        context.push('/families');
+        context.go('/families');
         break;
 
       case 3:
@@ -2322,11 +2322,11 @@ Widget _todayCard({
 
       case 4:
         // Open the user's profile.
-        context.push('/profile').then((_) {
-          if (mounted) {
-            loadUserProfile();
-          }
-        });
+        context.go('/profile');//.then((_) {
+        //   if (mounted) {
+        //     loadUserProfile();
+        //   }
+        // });
         break;
     }
   },

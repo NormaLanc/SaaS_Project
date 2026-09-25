@@ -192,9 +192,11 @@ GoRoute(
     final familyId =
         state.pathParameters['familyId']!;
 
+    final childId = state.uri.queryParameters['childId'];    
+
     return AddEventPage(
-      familyId:
-          familyId,
+      familyId: familyId,
+      childId: childId,
     );
   },
 ),
