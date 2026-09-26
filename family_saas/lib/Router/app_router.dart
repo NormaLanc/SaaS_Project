@@ -24,6 +24,12 @@ import '../Pages/App/intro_page.dart';
 import '../Pages/splash_page.dart';
 import '../Pages/App/families_page.dart';
 import '../Pages/App/family_timeline.dart';
+import '../Pages/App/Settings/change_email.dart';
+import '../Pages/App/Settings/change_passw.dart';
+import '../Pages/App/Settings/family_access.dart';
+import '../Pages/App/Settings/notification_settings.dart';
+import '../Pages/App/Settings/support.dart';
+import '../Pages/App/Settings/member_permissions.dart';
 
 final GoRouter appRouter = GoRouter(
   // initialLocation: kIsWeb ? '/' : '/welcome',
@@ -249,6 +255,47 @@ GoRoute(
   path: '/families',
   builder: (context, state) =>
       const FamiliesPage(),
+),
+GoRoute(
+  path: '/settings/change-password',
+  builder: (context, state) =>
+      const ChangePasswordPage(),
+),
+
+GoRoute(
+  path: '/settings/change-email',
+  builder: (context, state) =>
+      const ChangeEmailPage(),
+),
+
+GoRoute(
+  path: '/settings/family-access',
+  builder: (context, state) =>
+      const FamilyAccessPage(),
+),
+
+GoRoute(
+  path: '/settings/notifications',
+  builder: (context, state) =>
+      const NotificationSettingsPage(),
+),
+
+GoRoute(
+  path: '/settings/support',
+  builder: (context, state) =>
+      const ContactSupportPage(),
+),
+GoRoute(
+  path:
+      '/settings/family-access/member/:membershipId',
+  builder: (context, state) {
+    final membershipId =
+        state.pathParameters['membershipId']!;
+
+    return MemberPermissionsPage(
+      membershipId: membershipId,
+    );
+  },
 ),
   ],
 );
