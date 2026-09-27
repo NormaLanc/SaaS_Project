@@ -39,6 +39,8 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
 
   Map<String, int> postLikeCounts = {};
 
+  Map<String, int> postCommentCounts = {};
+
   Set<String> likedPostIds = {};
 
   bool isUpdatingPostLike = false;
@@ -785,6 +787,8 @@ if (postAuthorIds.isNotEmpty) {
 
     await loadPostLikes();
 
+    await loadPostCommentCounts();
+
     await scrollToTargetPhoto();
   } catch (e) {
     debugPrint(
@@ -1057,6 +1061,71 @@ Future<void> loadPostLikes() async {
   } catch (e) {
     debugPrint(
       'Unable to load family post likes: $e',
+    );
+  }
+}
+
+Future<void> loadPostCommentCounts() async {
+  try {
+    final postIds = feedItems
+        .where(
+          (item) => item['type'] == 'post',
+        )
+        .map(
+          (item) => item['id']?.toString(),
+        )
+        .whereType<String>()
+        .where(
+          (id) => id.isNotEmpty,
+        )
+        .toList();
+
+    if (postIds.isEmpty) {
+      if (!mounted) return;
+
+      setState(() {
+        postCommentCounts = {};
+      });
+
+      return;
+    }
+
+    final response = await supabase
+        .from('Family_Post_Comments')
+        .select('post_id')
+        .inFilter(
+          'post_id',
+          postIds,
+        );
+
+    final comments =
+        List<Map<String, dynamic>>.from(
+      response,
+    );
+
+    final counts = <String, int>{};
+
+    for (final comment in comments) {
+      final postId =
+          comment['post_id']?.toString();
+
+      if (postId == null ||
+          postId.isEmpty) {
+        continue;
+      }
+
+      counts[postId] =
+          (counts[postId] ?? 0) + 1;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      postCommentCounts = counts;
+    });
+  } catch (e) {
+    debugPrint(
+      'Unable to load family post comment counts: $e',
     );
   }
 }
@@ -1755,6 +1824,1202 @@ Future<void> createCommentLikeNotification({
       'notification: $e',
     );
   }
+}
+
+Future<void> showFamilyPostComments(
+  String postId,
+) async {
+  final currentUser =
+      supabase.auth.currentUser;
+
+  if (currentUser == null ||
+      postId.isEmpty) {
+    return;
+  }
+
+  final commentController =
+      TextEditingController();
+
+  List<Map<String, dynamic>> comments = [];
+
+  bool isLoadingComments = true;
+  bool isPostingComment = false;
+
+  String? replyingToCommentId;
+  String? replyingToName;
+
+  Map<String, int> commentLikeCounts = {};
+
+  Set<String> likedCommentIds = {};
+
+  Set<String> updatingCommentLikeIds = {};
+
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor:
+        FolktriColors.surface,
+    shape:
+        const RoundedRectangleBorder(
+      borderRadius:
+          BorderRadius.vertical(
+        top: Radius.circular(24),
+      ),
+    ),
+    builder: (sheetContext) {
+      return StatefulBuilder(
+        builder: (
+          context,
+          setSheetState,
+        ) {
+          Future<void> loadCommentLikes() async {
+            try {
+              final commentIds = comments
+        .map(
+          (comment) =>
+              comment['id']?.toString(),
+        )
+        .whereType<String>()
+        .where(
+          (id) => id.isNotEmpty,
+        )
+        .toList();
+
+    if (commentIds.isEmpty) {
+      if (!sheetContext.mounted) {
+        return;
+      }
+
+      setSheetState(() {
+        commentLikeCounts = {};
+        likedCommentIds = {};
+      });
+
+      return;
+    }
+
+    final response = await supabase
+        .from(
+          'Family_Post_Comment_Likes',
+        )
+        .select(
+          'comment_id, user_id',
+        )
+        .inFilter(
+          'comment_id',
+          commentIds,
+        );
+
+    final likes =
+        List<Map<String, dynamic>>.from(
+      response,
+    );
+
+    final counts = <String, int>{};
+    final currentUserLikes = <String>{};
+
+    for (final like in likes) {
+      final commentId =
+          like['comment_id']?.toString();
+
+      final userId =
+          like['user_id']?.toString();
+
+      if (commentId == null ||
+          commentId.isEmpty) {
+        continue;
+      }
+
+      counts[commentId] =
+          (counts[commentId] ?? 0) + 1;
+
+      if (userId == currentUser.id) {
+        currentUserLikes.add(
+          commentId,
+        );
+      }
+    }
+
+    if (!sheetContext.mounted) {
+      return;
+    }
+
+    setSheetState(() {
+      commentLikeCounts = counts;
+      likedCommentIds = currentUserLikes;
+    });
+  } catch (e) {
+    debugPrint(
+      'Unable to load family post comment likes: $e',
+    );
+  }
+}
+
+          Future<void> toggleCommentLike(
+  String commentId,
+) async {
+  if (commentId.isEmpty ||
+      updatingCommentLikeIds.contains(
+        commentId,
+      )) {
+    return;
+  }
+
+  final isLiked =
+      likedCommentIds.contains(
+    commentId,
+  );
+
+  try {
+    setSheetState(() {
+      updatingCommentLikeIds.add(
+        commentId,
+      );
+    });
+
+    if (isLiked) {
+      await supabase
+          .from(
+            'Family_Post_Comment_Likes',
+          )
+          .delete()
+          .eq(
+            'comment_id',
+            commentId,
+          )
+          .eq(
+            'user_id',
+            currentUser.id,
+          );
+    } else {
+      await supabase
+          .from(
+            'Family_Post_Comment_Likes',
+          )
+          .insert({
+        'comment_id': commentId,
+        'user_id': currentUser.id,
+      });
+    }
+
+    await loadCommentLikes();
+  } catch (e) {
+    debugPrint(
+      'Unable to update family post comment like: $e',
+    );
+
+    if (!sheetContext.mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      sheetContext,
+    ).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Unable to update comment like: $e',
+        ),
+      ),
+    );
+  } finally {
+    if (sheetContext.mounted) {
+      setSheetState(() {
+        updatingCommentLikeIds.remove(
+          commentId,
+        );
+      });
+    }
+  }
+}
+
+          Future<void> loadComments() async {
+            try {
+              final response =
+                  await supabase
+                      .from(
+                        'Family_Post_Comments',
+                      )
+                      .select(
+                        '''
+                        id,
+                        post_id,
+                        user_id,
+                        comment_text,
+                        created_at,
+                        parent_comment_id
+                        ''',
+                      )
+                      .eq(
+                        'post_id',
+                        postId,
+                      )
+                      .order(
+                        'created_at',
+                        ascending: true,
+                      );
+
+              final loadedComments =
+                  List<Map<String, dynamic>>
+                      .from(
+                response,
+              );
+
+              final userIds =
+                  loadedComments
+                      .map(
+                        (comment) =>
+                            comment[
+                                    'user_id']
+                                ?.toString(),
+                      )
+                      .whereType<String>()
+                      .where(
+                        (id) =>
+                            id.isNotEmpty,
+                      )
+                      .toSet()
+                      .toList();
+
+              final profilesByUserId =
+                  <String,
+                      Map<String,
+                          dynamic>>{};
+
+              if (userIds.isNotEmpty) {
+                final profileResponse =
+                    await supabase
+                        .from(
+                          'Profiles',
+                        )
+                        .select(
+                          '''
+                          user_id,
+                          first_name,
+                          last_name,
+                          profile_photo_path
+                          ''',
+                        )
+                        .inFilter(
+                          'user_id',
+                          userIds,
+                        );
+
+                final profiles = List<
+                    Map<String,
+                        dynamic>>.from(
+                  profileResponse,
+                );
+
+                for (final profile
+                    in profiles) {
+                  final userId =
+                      profile['user_id']
+                          ?.toString();
+
+                  if (userId == null ||
+                      userId.isEmpty) {
+                    continue;
+                  }
+
+                  final profilePhotoPath =
+                      profile[
+                              'profile_photo_path']
+                          ?.toString()
+                          .trim();
+
+                  String? signedPhotoUrl;
+
+                  if (profilePhotoPath !=
+                          null &&
+                      profilePhotoPath
+                          .isNotEmpty) {
+                    try {
+                      signedPhotoUrl =
+                          await supabase
+                              .storage
+                              .from(
+                                'profile-photos',
+                              )
+                              .createSignedUrl(
+                                profilePhotoPath,
+                                3600,
+                              );
+                    } catch (e) {
+                      debugPrint(
+                        'Unable to load post commenter profile photo: $e',
+                      );
+                    }
+                  }
+
+                  profile[
+                          'signed_photo_url'] =
+                      signedPhotoUrl;
+
+                  profilesByUserId[
+                      userId] = profile;
+                }
+              }
+
+              for (final comment
+                  in loadedComments) {
+                final userId =
+                    comment['user_id']
+                        ?.toString();
+
+                comment['profile'] =
+                    userId == null
+                        ? null
+                        : profilesByUserId[
+                            userId];
+              }
+
+              if (!sheetContext.mounted) {
+                return;
+              }
+
+              setSheetState(() {
+                comments =
+                    loadedComments;
+
+                isLoadingComments =
+                    false;
+              });
+
+            await loadCommentLikes();
+
+            } catch (e) {
+              debugPrint(
+                'Unable to load family post comments: $e',
+              );
+
+              if (!sheetContext.mounted) {
+                return;
+              }
+
+              setSheetState(() {
+                isLoadingComments =
+                    false;
+              });
+
+              
+            }
+          }
+
+          Future<void> postComment() async {
+            final commentText =
+                commentController.text
+                    .trim();
+
+            if (commentText.isEmpty ||
+                isPostingComment) {
+              return;
+            }
+
+            try {
+              setSheetState(() {
+                isPostingComment = true;
+              });
+
+              await supabase
+                  .from(
+                    'Family_Post_Comments',
+                  )
+                  .insert({
+                    'post_id': postId,
+                    'user_id': currentUser.id,
+                    'comment_text': commentText,
+                    'parent_comment_id': replyingToCommentId,
+                
+                  });
+
+              commentController.clear();
+
+              setSheetState(() {
+                replyingToCommentId = null;
+                replyingToName = null;
+              });
+
+              await loadComments();
+
+              await loadPostCommentCounts();
+            } catch (e) {
+              debugPrint(
+                'Unable to post family post comment: $e',
+              );
+
+              if (!sheetContext.mounted) {
+                return;
+              }
+
+              ScaffoldMessenger.of(
+                sheetContext,
+              ).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Unable to post comment: $e',
+                  ),
+                ),
+              );
+            } finally {
+              if (sheetContext.mounted) {
+                setSheetState(() {
+                  isPostingComment =
+                      false;
+                });
+              }
+            }
+          }
+
+          Future<void> deleteComment(
+  String commentId,
+) async {
+  try {
+    await supabase
+        .from(
+          'Family_Post_Comments',
+        )
+        .delete()
+        .eq(
+          'id',
+          commentId,
+        )
+        .eq(
+          'user_id',
+          currentUser.id,
+        );
+
+    await loadComments();
+
+    await loadPostCommentCounts();
+  } catch (e) {
+    debugPrint(
+      'Unable to delete family post comment: $e',
+    );
+
+    if (!sheetContext.mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      sheetContext,
+    ).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Unable to delete comment: $e',
+        ),
+      ),
+    );
+  }
+}
+
+          Widget buildThreadedComment(
+  Map<String, dynamic> comment,
+  int depth,
+) {
+  final commentId =
+      comment['id']?.toString() ?? '';
+
+  final profile =
+      comment['profile']
+          as Map<String, dynamic>?;
+
+  final firstName =
+      profile?['first_name']
+              ?.toString()
+              .trim() ??
+          '';
+
+  final lastName =
+      profile?['last_name']
+              ?.toString()
+              .trim() ??
+          '';
+
+  final displayName = [
+    firstName,
+    lastName,
+  ]
+      .where(
+        (name) => name.isNotEmpty,
+      )
+      .join(' ');
+
+  final signedPhotoUrl =
+      profile?['signed_photo_url']
+          ?.toString();
+
+  final isOwnComment =
+      comment['user_id']?.toString() ==
+          currentUser.id;
+
+  final isCommentLiked =
+      likedCommentIds.contains(
+    commentId,
+  );
+
+  final commentLikeCount =
+      commentLikeCounts[commentId] ?? 0;
+
+  // Find comments whose parent is THIS
+  // specific comment/reply.
+  final childReplies = comments
+      .where(
+        (candidate) =>
+            candidate['parent_comment_id']
+                ?.toString() ==
+            commentId,
+      )
+      .toList();
+
+  // Allow unlimited reply depth in Supabase,
+  // but stop pushing the UI farther right
+  // after 3 visual levels.
+  final visualDepth =
+      depth > 3 ? 3 : depth;
+
+  final avatarRadius =
+      depth == 0 ? 18.0 : 14.0;
+
+  return Padding(
+    padding: EdgeInsets.only(
+      left: visualDepth == 0
+          ? 0
+          : 26.0,
+      bottom: 12,
+    ),
+    child: Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: avatarRadius,
+              backgroundColor:
+                  FolktriColors
+                      .lightLavender,
+              backgroundImage:
+                  signedPhotoUrl != null &&
+                          signedPhotoUrl
+                              .isNotEmpty
+                      ? NetworkImage(
+                          signedPhotoUrl,
+                        )
+                      : null,
+              child:
+                  signedPhotoUrl == null ||
+                          signedPhotoUrl
+                              .isEmpty
+                      ? Icon(
+                          Icons
+                              .person_rounded,
+                          size: depth == 0
+                              ? 18
+                              : 14,
+                          color:
+                              FolktriColors
+                                  .primaryIndigo,
+                        )
+                      : null,
+            ),
+
+            const SizedBox(
+              width: 9,
+            ),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment
+                        .start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          displayName.isEmpty
+                              ? 'Family member'
+                              : displayName,
+                          style: TextStyle(
+                            color:
+                                FolktriColors
+                                    .primaryText,
+                            fontSize:
+                                depth == 0
+                                    ? 13
+                                    : 12,
+                            fontWeight:
+                                FontWeight
+                                    .w700,
+                          ),
+                        ),
+                      ),
+
+                      if (isOwnComment)
+                        PopupMenuButton<
+                            String>(
+                          padding:
+                              EdgeInsets.zero,
+                          icon: Icon(
+                            Icons
+                                .more_vert_rounded,
+                            size:
+                                depth == 0
+                                    ? 19
+                                    : 17,
+                            color:
+                                FolktriColors
+                                    .secondaryText,
+                          ),
+                          onSelected:
+                              (value) async {
+                            if (value ==
+                                'delete') {
+                              await deleteComment(
+                                commentId,
+                              );
+                            }
+                          },
+                          itemBuilder:
+                              (context) =>
+                                  const [
+                            PopupMenuItem<
+                                String>(
+                              value:
+                                  'delete',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons
+                                        .delete_outline_rounded,
+                                    size: 19,
+                                  ),
+                                  SizedBox(
+                                    width: 8,
+                                  ),
+                                  Text(
+                                    'Delete',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+
+                  const SizedBox(
+                    height: 2,
+                  ),
+
+                  Text(
+                    comment['comment_text']
+                            ?.toString() ??
+                        '',
+                    style: TextStyle(
+                      color:
+                          FolktriColors
+                              .primaryText,
+                      fontSize:
+                          depth == 0
+                              ? 14
+                              : 13,
+                      height: 1.35,
+                    ),
+                  ),
+
+                  const SizedBox(
+                    height: 5,
+                  ),
+
+                  Row(
+                    children: [
+                      InkWell(
+                        borderRadius:
+                            BorderRadius
+                                .circular(
+                          12,
+                        ),
+                        onTap:
+                            updatingCommentLikeIds
+                                    .contains(
+                                      commentId,
+                                    )
+                                ? null
+                                : () {
+                                    toggleCommentLike(
+                                      commentId,
+                                    );
+                                  },
+                        child: Padding(
+                          padding:
+                              const EdgeInsets
+                                  .symmetric(
+                            vertical: 3,
+                            horizontal: 2,
+                          ),
+                          child: Row(
+                            mainAxisSize:
+                                MainAxisSize
+                                    .min,
+                            children: [
+                              Icon(
+                                isCommentLiked
+                                    ? Icons
+                                        .favorite_rounded
+                                    : Icons
+                                        .favorite_border_rounded,
+                                size: 15,
+                                color:
+                                    isCommentLiked
+                                        ? FolktriColors
+                                            .dustyRose
+                                        : FolktriColors
+                                            .secondaryText,
+                              ),
+
+                              if (commentLikeCount >
+                                  0) ...[
+                                const SizedBox(
+                                  width: 4,
+                                ),
+
+                                Text(
+                                  '$commentLikeCount',
+                                  style:
+                                      TextStyle(
+                                    color:
+                                        isCommentLiked
+                                            ? FolktriColors
+                                                .dustyRose
+                                            : FolktriColors
+                                                .secondaryText,
+                                    fontSize:
+                                        11,
+                                    fontWeight:
+                                        FontWeight
+                                            .w600,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(
+                        width: 14,
+                      ),
+
+                      // IMPORTANT:
+                      // Every comment AND every
+                      // reply gets this button.
+                      InkWell(
+                        borderRadius:
+                            BorderRadius
+                                .circular(
+                          12,
+                        ),
+                        onTap: () {
+                          setSheetState(
+                            () {
+                              replyingToCommentId =
+                                  commentId;
+
+                              replyingToName =
+                                  displayName
+                                          .isEmpty
+                                      ? 'family member'
+                                      : displayName;
+                            },
+                          );
+                        },
+                        child:
+                            const Padding(
+                          padding:
+                              EdgeInsets
+                                  .symmetric(
+                            vertical: 3,
+                            horizontal: 2,
+                          ),
+                          child: Text(
+                            'Reply',
+                            style:
+                                TextStyle(
+                              color:
+                                  FolktriColors
+                                      .primaryIndigo,
+                              fontSize:
+                                  12,
+                              fontWeight:
+                                  FontWeight
+                                      .w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        // Recursively display replies
+        // belonging to this exact comment.
+        if (childReplies.isNotEmpty)
+          Padding(
+            padding:
+                const EdgeInsets.only(
+              top: 8,
+            ),
+            child: Column(
+              children:
+                  childReplies.map(
+                (reply) {
+                  return buildThreadedComment(
+                    reply,
+                    depth + 1,
+                  );
+                },
+              ).toList(),
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+          if (isLoadingComments) {
+            loadComments();
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom:
+                  MediaQuery.of(context)
+                      .viewInsets
+                      .bottom,
+            ),
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height:
+                    MediaQuery.of(context)
+                            .size
+                            .height *
+                        0.72,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding:
+                          const EdgeInsets
+                              .fromLTRB(
+                        20,
+                        16,
+                        12,
+                        12,
+                      ),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Comments',
+                              textAlign:
+                                  TextAlign
+                                      .center,
+                              style:
+                                  TextStyle(
+                                color:
+                                    FolktriColors
+                                        .primaryText,
+                                fontSize:
+                                    18,
+                                fontWeight:
+                                    FontWeight
+                                        .bold,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip:
+                                'Close comments',
+                            onPressed: () {
+                              FocusScope.of(
+                                sheetContext,
+                              ).unfocus();
+
+                              Navigator.of(
+                                sheetContext,
+                              ).pop();
+                            },
+                            icon:
+                                const Icon(
+                              Icons
+                                  .close_rounded,
+                              color:
+                                  FolktriColors
+                                      .secondaryText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const Divider(
+                      height: 1,
+                      color:
+                          FolktriColors
+                              .lightLavender,
+                    ),
+
+                    Expanded(
+                      child:
+                          isLoadingComments
+                              ? const Center(
+                                  child:
+                                      CircularProgressIndicator(),
+                                )
+                              : comments
+                                      .isEmpty
+                                  ? const Center(
+                                      child:
+                                          Text(
+                                        'No comments yet.\nBe the first to comment.',
+                                        textAlign:
+                                            TextAlign.center,
+                                        style:
+                                            TextStyle(
+                                          color:
+                                              FolktriColors.secondaryText,
+                                        ),
+                                      ),
+                                    )
+                                  : Builder(
+    builder: (context) {
+      final topLevelComments =
+          comments.where(
+        (comment) =>
+            comment['parent_comment_id'] ==
+            null,
+      ).toList();
+
+      return ListView.builder(
+        padding:
+            const EdgeInsets.all(
+          16,
+        ),
+        itemCount:
+            topLevelComments.length,
+        itemBuilder: (
+          context,
+          index,
+        ) {
+          return buildThreadedComment(
+            topLevelComments[index],
+            0,
+          );
+        },
+      );
+    },
+  ),
+                    ),
+
+                    const Divider(
+                      height: 1,
+                      color:
+                          FolktriColors
+                              .lightLavender,
+                    ),
+
+                    Padding(
+  padding:
+      const EdgeInsets.fromLTRB(
+    14,
+    8,
+    14,
+    12,
+  ),
+  child: Column(
+    mainAxisSize:
+        MainAxisSize.min,
+    children: [
+      if (replyingToCommentId !=
+          null)
+        Container(
+          margin:
+              const EdgeInsets.only(
+            bottom: 8,
+          ),
+          padding:
+              const EdgeInsets
+                  .symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
+          decoration:
+              BoxDecoration(
+            color:
+                FolktriColors
+                    .lightLavender,
+            borderRadius:
+                BorderRadius.circular(
+              12,
+            ),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.reply_rounded,
+                size: 17,
+                color:
+                    FolktriColors
+                        .primaryIndigo,
+              ),
+
+              const SizedBox(
+                width: 7,
+              ),
+
+              Expanded(
+                child: Text(
+                  'Replying to '
+                  '${replyingToName ?? 'family member'}',
+                  style:
+                      const TextStyle(
+                    color:
+                        FolktriColors
+                            .primaryText,
+                    fontSize: 12,
+                    fontWeight:
+                        FontWeight
+                            .w600,
+                  ),
+                ),
+              ),
+
+              InkWell(
+                borderRadius:
+                    BorderRadius
+                        .circular(
+                  20,
+                ),
+                onTap: () {
+                  setSheetState(
+                    () {
+                      replyingToCommentId =
+                          null;
+
+                      replyingToName =
+                          null;
+                    },
+                  );
+                },
+                child:
+                    const Padding(
+                  padding:
+                      EdgeInsets.all(
+                    4,
+                  ),
+                  child: Icon(
+                    Icons
+                        .close_rounded,
+                    size: 17,
+                    color:
+                        FolktriColors
+                            .secondaryText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+      Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller:
+                  commentController,
+              minLines: 1,
+              maxLines: 4,
+              maxLength: 2000,
+              decoration:
+                  InputDecoration(
+                counterText: '',
+                hintText:
+                    replyingToCommentId !=
+                            null
+                        ? 'Write a reply...'
+                        : 'Write a comment...',
+                filled: true,
+                fillColor:
+                    FolktriColors
+                        .background,
+                border:
+                    OutlineInputBorder(
+                  borderRadius:
+                      BorderRadius
+                          .circular(
+                    18,
+                  ),
+                  borderSide:
+                      BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(
+            width: 8,
+          ),
+
+          IconButton(
+            tooltip:
+                replyingToCommentId !=
+                        null
+                    ? 'Post reply'
+                    : 'Post comment',
+            onPressed:
+                isPostingComment
+                    ? null
+                    : postComment,
+            icon:
+                isPostingComment
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child:
+                            CircularProgressIndicator(
+                          strokeWidth:
+                              2,
+                        ),
+                      )
+                    : const Icon(
+                        Icons
+                            .send_rounded,
+                        color:
+                            FolktriColors
+                                .primaryIndigo,
+                      ),
+          ),
+        ],
+      ),
+    ],
+  ),
+),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
 }
 
 Future<void> showPhotoComments(String photoId) async {
@@ -3153,6 +4418,8 @@ Widget buildFamilyPostCard(Map<String, dynamic> post,) {
 
   final likeCount = postLikeCounts[postId] ?? 0;
 
+  final commentCount = postCommentCounts[postId] ?? 0;
+
   final postText =
       post['post_text']
               ?.toString()
@@ -3406,29 +4673,56 @@ Widget buildFamilyPostCard(Map<String, dynamic> post,) {
       width: 22,
     ),
 
-    const Icon(
-      Icons
-          .chat_bubble_outline_rounded,
-      size: 19,
-      color:
-          FolktriColors.secondaryText,
+    InkWell(
+  borderRadius:
+      BorderRadius.circular(20),
+  onTap:
+      postId.isEmpty
+          ? null
+          : () {
+              showFamilyPostComments(
+                postId,
+              );
+            },
+  child: Padding(
+    padding:
+        const EdgeInsets.symmetric(
+      vertical: 6,
+      horizontal: 4,
     ),
+    child: Row(
+      children: [
+        const Icon(
+          Icons
+              .chat_bubble_outline_rounded,
+          size: 19,
+          color:
+              FolktriColors
+                  .secondaryText,
+        ),
 
-    const SizedBox(
-      width: 6,
-    ),
+        const SizedBox(
+          width: 6,
+        ),
 
-    const Text(
-      'Comment',
-      style:
-          TextStyle(
-        color:
-            FolktriColors.secondaryText,
-        fontSize: 12,
-        fontWeight:
-            FontWeight.w600,
-      ),
+        Text(
+          commentCount > 0
+              ? '$commentCount'
+              : 'Comment',
+          style:
+              const TextStyle(
+            color:
+                FolktriColors
+                    .secondaryText,
+            fontSize: 12,
+            fontWeight:
+                FontWeight.w600,
+          ),
+        ),
+      ],
     ),
+  ),
+),
   ],
 )
       ],
