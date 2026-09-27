@@ -1830,25 +1830,25 @@ Widget build(BuildContext context) {
     );
   }
 
-  final firstName =
-      child!['first_name'] ?? '';
+  // final firstName =
+  //     child!['first_name'] ?? '';
 
-  final middleName =
-      child!['middle_name'] ?? '';
+  // final middleName =
+  //     child!['middle_name'] ?? '';
 
-  final lastName =
-      child!['last_name'] ?? '';
+  // final lastName =
+  //     child!['last_name'] ?? '';
 
-  final fullName = [
-    firstName,
-    middleName,
-    lastName,
-  ]
-      .where(
-        (name) =>
-            name.toString().trim().isNotEmpty,
-      )
-      .join(' ');
+  // final fullName = [
+  //   firstName,
+  //   middleName,
+  //   lastName,
+  // ]
+      // .where(
+      //   (name) =>
+      //       name.toString().trim().isNotEmpty,
+      // )
+      // .join(' ');
 
   return DefaultTabController(
     length: 4,
