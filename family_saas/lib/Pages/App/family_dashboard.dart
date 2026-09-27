@@ -7,7 +7,12 @@ import 'package:google_fonts/google_fonts.dart';
 
 
 class FamilyDashboard extends StatefulWidget {
-  const FamilyDashboard({super.key});
+  final String? targetPhotoId;
+
+  const FamilyDashboard({
+    super.key,
+    this.targetPhotoId,
+  });
 
 
   @override
@@ -22,6 +27,12 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
 
   List<Map<String, dynamic>> feedItems = [];
   bool isLoadingFeed = true;
+
+  final Map<String, GlobalKey> photoCardKeys = {};
+
+  String? highlightedPhotoId;
+
+  bool hasScrolledToTargetPhoto = false;
 
   Map<String, int> photoLikeCounts = {};
   Set<String> likedPhotoIds = {};
@@ -450,6 +461,8 @@ Future<void> loadFeed() async {
 
     await loadPhotoLikes();
     await loadPhotoCommentCounts();
+
+    await scrollToTargetPhoto();
   } catch (e) {
     debugPrint(
       'Unable to load dashboard feed: $e',
@@ -461,6 +474,92 @@ Future<void> loadFeed() async {
       isLoadingFeed = false;
     });
   }
+}
+
+Future<void> scrollToTargetPhoto() async {
+  final targetPhotoId =
+      widget.targetPhotoId;
+
+  if (targetPhotoId == null ||
+      targetPhotoId.isEmpty ||
+      hasScrolledToTargetPhoto) {
+    return;
+  }
+
+  final targetExists = feedItems.any(
+    (item) =>
+        item['type'] == 'photo' &&
+        item['id']?.toString() ==
+            targetPhotoId,
+  );
+
+  if (!targetExists) {
+    debugPrint(
+      'Target photo is not in the dashboard feed: '
+      '$targetPhotoId',
+    );
+    return;
+  }
+
+  hasScrolledToTargetPhoto = true;
+
+  // Wait for Flutter to actually build the feed cards.
+  WidgetsBinding.instance
+      .addPostFrameCallback((_) async {
+    if (!mounted) return;
+
+    final targetKey =
+        photoCardKeys[targetPhotoId];
+
+    final targetContext =
+        targetKey?.currentContext;
+
+    if (targetContext == null) {
+      // The feed may still be laying itself out.
+      hasScrolledToTargetPhoto = false;
+
+      await Future.delayed(
+        const Duration(
+          milliseconds: 250,
+        ),
+      );
+
+      if (!mounted) return;
+
+      await scrollToTargetPhoto();
+
+      return;
+    }
+
+    setState(() {
+      highlightedPhotoId =
+          targetPhotoId;
+    });
+
+    await Scrollable.ensureVisible(
+      targetContext,
+      duration: const Duration(
+        milliseconds: 650,
+      ),
+      curve: Curves.easeInOut,
+      alignment: 0.15,
+    );
+
+    await Future.delayed(
+      const Duration(
+        seconds: 2,
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (highlightedPhotoId ==
+        targetPhotoId) {
+      setState(() {
+        highlightedPhotoId = null;
+      });
+    }
+  });
 }
 
 Future<void> loadPhotoLikes() async {
@@ -608,9 +707,126 @@ Future<void> loadPhotoCommentCounts() async {
   }
 }
 
-Future<void> togglePhotoLike(
-  String photoId,
-) async {
+Future<void> createPhotoLikeNotification({
+  required String photoId,
+}) async {
+  final currentUser =
+      supabase.auth.currentUser;
+
+  if (currentUser == null) return;
+
+  try {
+    // Get the photo so we know who created it
+    // and which family it belongs to.
+    final photo = await supabase
+        .from('Photos')
+        .select(
+          '''
+          id,
+          family_id,
+          created_by
+          ''',
+        )
+        .eq(
+          'id',
+          photoId,
+        )
+        .maybeSingle();
+
+    if (photo == null) return;
+
+    final recipientUserId =
+        photo['created_by']?.toString();
+
+    final familyId =
+        photo['family_id']?.toString();
+
+    if (recipientUserId == null ||
+        recipientUserId.isEmpty ||
+        familyId == null ||
+        familyId.isEmpty) {
+      return;
+    }
+
+    // Never notify somebody that they liked
+    // their own photo.
+    if (recipientUserId ==
+        currentUser.id) {
+      return;
+    }
+
+    // Get the name of the person who liked it.
+    final profile = await supabase
+        .from('Profiles')
+        .select(
+          '''
+          first_name,
+          last_name
+          ''',
+        )
+        .eq(
+          'user_id',
+          currentUser.id,
+        )
+        .maybeSingle();
+
+    final firstName =
+        profile?['first_name']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final lastName =
+        profile?['last_name']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final actorName = [
+      firstName,
+      lastName,
+    ].where(
+      (name) => name.isNotEmpty,
+    ).join(' ');
+
+    final displayName =
+        actorName.isEmpty
+            ? 'A family member'
+            : actorName;
+
+    await supabase
+        .from('Notifications')
+        .insert({
+      'recipient_user_id':
+          recipientUserId,
+      'requested_user_id':
+          currentUser.id,
+      'family_id':
+          familyId,
+      'type':
+          'photo_like',
+      'title':
+          'New photo like',
+      'message':
+          '$displayName liked your photo.',
+      'is_read':
+          false,
+      'status':
+          'active',
+      'reference_type':
+          'photo',
+      'reference_id': photoId,
+      'action_required':
+          false,
+    });
+  } catch (e) {
+    debugPrint(
+      'Unable to create photo like notification: $e',
+    );
+  }
+}
+
+Future<void> togglePhotoLike(String photoId,) async {
   final user = supabase.auth.currentUser;
 
   if (user == null ||
@@ -645,6 +861,10 @@ Future<void> togglePhotoLike(
         'photo_id': photoId,
         'user_id': user.id,
       });
+
+      await createPhotoLikeNotification(
+        photoId: photoId,
+      );
     }
 
     await loadPhotoLikes();
@@ -672,27 +892,373 @@ Future<void> togglePhotoLike(
   }
 }
 
-Future<void> showPhotoComments(
-  String photoId,
-) async {
+Future<void> createCommentReplyNotification({
+  required String photoId,
+  required String parentCommentId,
+}) async {
   final currentUser =
       supabase.auth.currentUser;
 
   if (currentUser == null) return;
 
-  final commentController =
-      TextEditingController();
+  try {
+    // ==========================================
+    // GET PARENT COMMENT
+    // ==========================================
+
+    final parentComment = await supabase
+        .from('Photo_Comments')
+        .select(
+          '''
+          id,
+          user_id,
+          photo_id
+          ''',
+        )
+        .eq(
+          'id',
+          parentCommentId,
+        )
+        .maybeSingle();
+
+    if (parentComment == null) {
+      return;
+    }
+
+    final recipientUserId =
+        parentComment['user_id']
+            ?.toString();
+
+    if (recipientUserId == null ||
+        recipientUserId.isEmpty) {
+      return;
+    }
+
+    // Never notify someone about replying
+    // to their own comment.
+    if (recipientUserId ==
+        currentUser.id) {
+      return;
+    }
+
+    // ==========================================
+    // GET PHOTO / FAMILY
+    // ==========================================
+
+    final photo = await supabase
+        .from('Photos')
+        .select(
+          '''
+          id,
+          family_id
+          ''',
+        )
+        .eq(
+          'id',
+          photoId,
+        )
+        .maybeSingle();
+
+    if (photo == null) {
+      return;
+    }
+
+    final familyId =
+        photo['family_id']
+            ?.toString();
+
+    if (familyId == null ||
+        familyId.isEmpty) {
+      return;
+    }
+
+    // ==========================================
+    // GET REPLY AUTHOR'S NAME
+    // ==========================================
+
+    final profile = await supabase
+        .from('Profiles')
+        .select(
+          '''
+          first_name,
+          last_name
+          ''',
+        )
+        .eq(
+          'user_id',
+          currentUser.id,
+        )
+        .maybeSingle();
+
+    final firstName =
+        profile?['first_name']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final lastName =
+        profile?['last_name']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final actorName = [
+      firstName,
+      lastName,
+    ].where(
+      (name) => name.isNotEmpty,
+    ).join(' ');
+
+    final displayName =
+        actorName.isEmpty
+            ? 'A family member'
+            : actorName;
+
+    // ==========================================
+    // CREATE NOTIFICATION
+    // ==========================================
+
+    await supabase
+        .from('Notifications')
+        .insert({
+      'recipient_user_id':
+          recipientUserId,
+
+      'requested_user_id':
+          currentUser.id,
+
+      'family_id':
+          familyId,
+
+      'type':
+          'comment_reply',
+
+      'title':
+          'New reply',
+
+      'message':
+          '$displayName replied to your comment.',
+
+      'is_read':
+          false,
+
+      'status':
+          'active',
+
+      // We still target the photo because that
+      // is where the comment thread is displayed.
+      'reference_type':
+          'photo',
+
+      'reference_id':
+          photoId,
+
+      'action_required':
+          false,
+    });
+  } catch (e) {
+    debugPrint(
+      'Unable to create reply notification: $e',
+    );
+  }
+}
+
+Future<void> createCommentLikeNotification({
+  required String commentId,
+  required String photoId,
+}) async {
+  final currentUser =
+      supabase.auth.currentUser;
+
+  if (currentUser == null) return;
+
+  try {
+    // ==========================================
+    // FIND THE EXACT COMMENT / REPLY THAT
+    // RECEIVED THE LIKE
+    // ==========================================
+
+    final comment = await supabase
+        .from('Photo_Comments')
+        .select(
+          '''
+          id,
+          user_id,
+          photo_id
+          ''',
+        )
+        .eq(
+          'id',
+          commentId,
+        )
+        .maybeSingle();
+
+    if (comment == null) {
+      return;
+    }
+
+    final recipientUserId =
+        comment['user_id']?.toString();
+
+    if (recipientUserId == null ||
+        recipientUserId.isEmpty) {
+      return;
+    }
+
+    // Don't notify someone for liking
+    // their own comment.
+    if (recipientUserId ==
+        currentUser.id) {
+      return;
+    }
+
+    // ==========================================
+    // GET THE PHOTO'S FAMILY
+    // ==========================================
+
+    final photo = await supabase
+        .from('Photos')
+        .select(
+          '''
+          id,
+          family_id
+          ''',
+        )
+        .eq(
+          'id',
+          photoId,
+        )
+        .maybeSingle();
+
+    if (photo == null) {
+      return;
+    }
+
+    final familyId =
+        photo['family_id']?.toString();
+
+    if (familyId == null ||
+        familyId.isEmpty) {
+      return;
+    }
+
+    // ==========================================
+    // GET THE PERSON WHO LIKED THE COMMENT
+    // ==========================================
+
+    final profile = await supabase
+        .from('Profiles')
+        .select(
+          '''
+          first_name,
+          last_name
+          ''',
+        )
+        .eq(
+          'user_id',
+          currentUser.id,
+        )
+        .maybeSingle();
+
+    final firstName =
+        profile?['first_name']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final lastName =
+        profile?['last_name']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final actorName = [
+      firstName,
+      lastName,
+    ].where(
+      (name) => name.isNotEmpty,
+    ).join(' ');
+
+    final displayName =
+        actorName.isEmpty
+            ? 'A family member'
+            : actorName;
+
+    // ==========================================
+    // CREATE NOTIFICATION
+    // ==========================================
+
+    await supabase
+        .from('Notifications')
+        .insert({
+      'recipient_user_id':
+          recipientUserId,
+
+      'requested_user_id':
+          currentUser.id,
+
+      'family_id':
+          familyId,
+
+      'type':
+          'comment_like',
+
+      'title':
+          'New comment like',
+
+      'message':
+          '$displayName liked your comment.',
+
+      'is_read':
+          false,
+
+      'status':
+          'active',
+
+      // Navigate back to the photo containing
+      // this comment/reply.
+      'reference_type':
+          'photo',
+
+      'reference_id':
+          photoId,
+
+      'action_required':
+          false,
+    });
+  } catch (e) {
+    debugPrint(
+      'Unable to create comment like '
+      'notification: $e',
+    );
+  }
+}
+
+Future<void> showPhotoComments(String photoId) async {
+  final currentUser = supabase.auth.currentUser;
+
+  if (currentUser == null) return;
+
+  final commentController = TextEditingController();
+
+  final commentFocusNode = FocusNode();
 
   List<Map<String, dynamic>> comments = [];
 
   bool isLoadingComments = true;
   bool isPostingComment = false;
 
+  Map<String, int> commentLikeCounts = {};
+  Set<String> likedCommentIds = {};
+  Set<String> updatingCommentLikeIds = {};
+
+  String? replyingToCommentId;
+  String? replyingToName;
+
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor:
-        FolktriColors.surface,
+    backgroundColor:FolktriColors.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(
         top: Radius.circular(24),
@@ -704,20 +1270,159 @@ Future<void> showPhotoComments(
           context,
           setSheetState,
         ) {
+          Future<void> loadCommentLikes() async {
+            try {
+              final commentIds = comments
+                .map(
+                  (comment) => comment['id']?.toString(),
+                )
+                .whereType<String>()
+                .where((id) => id.isNotEmpty,).toList();
+
+              if (commentIds.isEmpty) {
+                if (!sheetContext.mounted) {
+                  return;
+                }
+
+              setSheetState(() {
+                commentLikeCounts = {};
+                likedCommentIds = {};
+              });
+
+                return;
+              }
+
+              final response = await supabase
+                .from('Comment_Likes')
+                .select('comment_id, user_id',)
+                .inFilter(
+                  'comment_id',
+                  commentIds,
+                );
+
+              final likes = List<Map<String, dynamic>>.from(response,);
+
+              final counts = <String, int>{};
+              final currentUserLikes = <String>{};
+
+              for (final like in likes) {
+                final commentId = like['comment_id']?.toString();
+
+                final userId = like['user_id']?.toString();
+
+                if (commentId == null || commentId.isEmpty) {
+                  continue;
+                }
+
+                counts[commentId] = (counts[commentId] ?? 0) + 1;
+
+                if (userId == currentUser.id) {
+                  currentUserLikes.add(commentId,);
+                }
+              }
+
+              if (!sheetContext.mounted) {
+                return;
+              }
+
+              setSheetState(() {
+                commentLikeCounts = counts;
+                likedCommentIds =
+                currentUserLikes;
+              });
+              } catch (e) {
+                debugPrint('Unable to load comment likes: $e',);
+              }
+            }
+
+            Future<void> toggleCommentLike(String commentId,) async {
+  if (commentId.isEmpty ||
+      updatingCommentLikeIds
+          .contains(commentId)) {
+    return;
+  }
+
+  final isLiked =
+      likedCommentIds.contains(
+    commentId,
+  );
+
+  try {
+    setSheetState(() {
+      updatingCommentLikeIds.add(
+        commentId,
+      );
+    });
+
+    if (isLiked) {
+      await supabase
+          .from('Comment_Likes')
+          .delete()
+          .eq(
+            'comment_id',
+            commentId,
+          )
+          .eq(
+            'user_id',
+            currentUser.id,
+          );
+    } else {
+      await supabase
+          .from('Comment_Likes')
+          .insert({
+        'comment_id': commentId,
+        'user_id': currentUser.id,
+      });
+
+      await createCommentLikeNotification(
+        commentId: commentId,
+        photoId: photoId,
+  );
+    }
+
+    await loadCommentLikes();
+  } catch (e) {
+    debugPrint(
+      'Unable to update comment like: $e',
+    );
+
+    if (!sheetContext.mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      sheetContext,
+    ).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Unable to update comment like: $e',
+        ),
+      ),
+    );
+  } finally {
+    if (sheetContext.mounted) {
+      setSheetState(() {
+        updatingCommentLikeIds.remove(
+          commentId,
+        );
+      });
+    }
+  }
+}
+
           Future<void> loadComments() async {
             try {
               final response =
                   await supabase
-                      .from(
-                        'Photo_Comments',
-                      )
+                      .from('Photo_Comments',)
                       .select(
                         '''
                         id,
                         photo_id,
                         user_id,
                         comment_text,
-                        created_at
+                        created_at,
+                        parent_comment_id
                         ''',
                       )
                       .eq(
@@ -729,39 +1434,24 @@ Future<void> showPhotoComments(
                         ascending: true,
                       );
 
-              final loadedComments =
-                  List<Map<String, dynamic>>
-                      .from(
-                response,
-              );
+              final loadedComments = List<Map<String, dynamic>>
+                      .from(response,);
 
-              final userIds =
-                  loadedComments
-                      .map(
-                        (comment) =>
-                            comment[
-                                    'user_id']
-                                ?.toString(),
+              final userIds = loadedComments.map(
+                        (comment) => comment['user_id']?.toString(),
                       )
                       .whereType<String>()
                       .where(
-                        (id) =>
-                            id.isNotEmpty,
+                        (id) => id.isNotEmpty,
                       )
                       .toSet()
                       .toList();
 
-              final profilesByUserId =
-                  <String,
-                      Map<String,
-                          dynamic>>{};
+              final profilesByUserId = <String, Map<String, dynamic>>{};
 
               if (userIds.isNotEmpty) {
-                final profileResponse =
-                    await supabase
-                        .from(
-                          'Profiles',
-                        )
+                final profileResponse = await supabase
+                        .from('Profiles',)
                         .select(
                           '''
                           user_id,
@@ -775,23 +1465,42 @@ Future<void> showPhotoComments(
                           userIds,
                         );
 
-                final profiles = List<
-                    Map<String,
-                        dynamic>>.from(
-                  profileResponse,
-                );
+                final profiles = List<Map<String,dynamic>>.from(profileResponse,);
 
-                for (final profile
-                    in profiles) {
-                  final userId =
-                      profile['user_id']
-                          ?.toString();
+                for (final profile in profiles) {
+                  final userId = profile['user_id']?.toString();
 
-                  if (userId != null) {
-                    profilesByUserId[
-                            userId] =
-                        profile;
+                  if (userId == null || userId.isEmpty) {
+                    continue;
                   }
+
+                final profilePhotoPath = profile['profile_photo_path']
+                  ?.toString()
+                  .trim();
+
+  String? signedPhotoUrl;
+
+  if (profilePhotoPath != null && profilePhotoPath.isNotEmpty) {
+    try {
+      signedPhotoUrl =
+          await supabase.storage
+              .from('profile-photos')
+              .createSignedUrl(
+                profilePhotoPath,
+                3600,
+              );
+    } catch (e) {
+      debugPrint(
+        'Unable to load commenter profile photo: $e',
+      );
+    }
+  }
+
+  profile['signed_photo_url'] =
+      signedPhotoUrl;
+
+  profilesByUserId[userId] =
+      profile;
                 }
               }
 
@@ -813,12 +1522,13 @@ Future<void> showPhotoComments(
               }
 
               setSheetState(() {
-                comments =
-                    loadedComments;
+                comments = loadedComments;
 
-                isLoadingComments =
-                    false;
+                isLoadingComments = false;
               });
+
+              await loadCommentLikes();
+
             } catch (e) {
               debugPrint(
                 'Unable to load comments: $e',
@@ -835,8 +1545,7 @@ Future<void> showPhotoComments(
             }
           }
 
-          Future<void> postComment()
-              async {
+          Future<void> postComment() async {
             final commentText =
                 commentController.text
                     .trim();
@@ -851,6 +1560,8 @@ Future<void> showPhotoComments(
                 isPostingComment = true;
               });
 
+              final parentCommentId = replyingToCommentId;
+
               await supabase
                   .from(
                     'Photo_Comments',
@@ -859,11 +1570,23 @@ Future<void> showPhotoComments(
                 'photo_id': photoId,
                 'user_id':
                     currentUser.id,
-                'comment_text':
-                    commentText,
+                'comment_text': commentText,
+                'parent_comment_id': replyingToCommentId,
               });
 
+              if (parentCommentId != null && parentCommentId.isNotEmpty) {
+                await createCommentReplyNotification(
+                  photoId: photoId,
+                  parentCommentId: parentCommentId,
+                );
+              }
+
               commentController.clear();
+
+              setSheetState(() {
+                replyingToCommentId = null;
+                replyingToName = null;
+              });
 
               await loadComments();
               await loadPhotoCommentCounts();
@@ -975,19 +1698,21 @@ Future<void> showPhotoComments(
                           ),
 
                           IconButton(
-                            onPressed: () {
-                              Navigator.pop(
-                                sheetContext,
-                              );
-                            },
-                            icon: const Icon(
-                              Icons
-                                  .close_rounded,
-                              color:
-                                  FolktriColors
-                                      .secondaryText,
-                            ),
-                          ),
+  tooltip: 'Close comments',
+  onPressed: () {
+    FocusScope.of(
+      sheetContext,
+    ).unfocus();
+
+    Navigator.of(
+      sheetContext,
+    ).pop();
+  },
+  icon: const Icon(
+    Icons.close_rounded,
+    color: FolktriColors.secondaryText,
+  ),
+),
                         ],
                       ),
                     ),
@@ -1067,172 +1792,244 @@ Future<void> showPhotoComments(
                                         ),
                                       ),
                                     )
-                                  : ListView
-                                      .builder(
-                                      padding:
-                                          const EdgeInsets
-                                              .symmetric(
-                                        vertical:
-                                            10,
-                                      ),
-                                      itemCount:
-                                          comments
-                                              .length,
-                                      itemBuilder:
-                                          (
-                                        context,
-                                        index,
-                                      ) {
-                                        final comment =
-                                            comments[
-                                                index];
+                                  : Builder(
+    builder: (context) {
+      final topLevelComments =
+          comments.where(
+        (comment) =>
+            comment['parent_comment_id'] ==
+                null,
+      ).toList();
 
-                                        return buildPhotoCommentTile(
-                                          comment:
-                                              comment,
-                                          currentUserId:
-                                              currentUser
-                                                  .id,
-                                          onDelete:
-                                              deleteComment,
-                                        );
-                                      },
-                                    ),
+      return ListView.builder(
+        padding:
+            const EdgeInsets.symmetric(
+          vertical: 10,
+        ),
+        itemCount:
+            topLevelComments.length,
+        itemBuilder: (
+          context,
+          index,
+        ) {
+          final comment =
+              topLevelComments[index];
+
+          final commentId =
+              comment['id']
+                      ?.toString() ??
+                  '';
+
+          final replies = comments.where(
+            (candidate) =>
+                candidate[
+                        'parent_comment_id']
+                    ?.toString() ==
+                commentId,
+          ).toList();
+
+          return buildPhotoCommentThread(
+            comment: comment,
+            replies: replies,
+            currentUserId:
+                currentUser.id,
+            commentLikeCounts:
+                commentLikeCounts,
+            likedCommentIds:
+                likedCommentIds,
+            updatingCommentLikeIds:
+                updatingCommentLikeIds,
+            onLike:
+                toggleCommentLike,
+            onReply: (
+              parentCommentId,
+              displayName,
+            ) {
+              setSheetState(() {
+                replyingToCommentId =
+                    parentCommentId;
+
+                replyingToName =
+                    displayName;
+              });
+
+              commentFocusNode.requestFocus();
+            },
+            onDelete:
+                deleteComment,
+          );
+        },
+      );
+    },
+  ),
                     ),
 
                     const Divider(
                       height: 1,
-                      color:
-                          FolktriColors
-                              .lightLavender,
+                      color: FolktriColors.lightLavender,
                     ),
 
                     Padding(
-                      padding:
-                          const EdgeInsets
-                              .fromLTRB(
-                        14,
-                        10,
-                        14,
-                        12,
-                      ),
-                      child: Row(
-                        crossAxisAlignment:
-                            CrossAxisAlignment
-                                .end,
-                        children: [
-                          CircleAvatar(
-                            radius: 18,
-                            backgroundColor:
-                                FolktriColors
-                                    .lightLavender,
-                            backgroundImage:
-                                profilePhotoUrl !=
-                                        null
-                                    ? NetworkImage(
-                                        profilePhotoUrl!,
-                                      )
-                                    : null,
-                            child:
-                                profilePhotoUrl ==
-                                        null
-                                    ? const Icon(
-                                        Icons
-                                            .person_rounded,
-                                        color:
-                                            FolktriColors
-                                                .primaryIndigo,
-                                        size:
-                                            19,
-                                      )
-                                    : null,
-                          ),
+  padding: const EdgeInsets.fromLTRB(
+    14,
+    8,
+    14,
+    12,
+  ),
+  child: Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      // Shows only when replying to someone.
+      if (replyingToCommentId != null)
+        Container(
+          margin: const EdgeInsets.only(
+            bottom: 8,
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
+          decoration: BoxDecoration(
+            color: FolktriColors.lightLavender,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.reply_rounded,
+                size: 17,
+                color: FolktriColors.primaryIndigo,
+              ),
 
-                          const SizedBox(
-                            width: 9,
-                          ),
+              const SizedBox(
+                width: 7,
+              ),
 
-                          Expanded(
-                            child:
-                                TextField(
-                              controller:
-                                  commentController,
-                              minLines: 1,
-                              maxLines: 4,
-                              maxLength:
-                                  1000,
-                              textCapitalization:
-                                  TextCapitalization
-                                      .sentences,
-                              decoration:
-                                  InputDecoration(
-                                hintText:
-                                    'Add a comment...',
-                                counterText:
-                                    '',
-                                filled:
-                                    true,
-                                fillColor:
-                                    FolktriColors
-                                        .background,
-                                contentPadding:
-                                    const EdgeInsets
-                                        .symmetric(
-                                  horizontal:
-                                      14,
-                                  vertical:
-                                      11,
-                                ),
-                                border:
-                                    OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius
-                                          .circular(
-                                    22,
-                                  ),
-                                  borderSide:
-                                      BorderSide
-                                          .none,
-                                ),
-                              ),
-                            ),
-                          ),
+              Expanded(
+                child: Text(
+                  'Replying to '
+                  '${replyingToName ?? 'family member'}',
+                  style: const TextStyle(
+                    color: FolktriColors.primaryIndigo,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
 
-                          const SizedBox(
-                            width: 5,
-                          ),
+              InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  setSheetState(() {
+                    replyingToCommentId = null;
+                    replyingToName = null;
+                  });
+                },
+                child: const Padding(
+                  padding: EdgeInsets.all(3),
+                  child: Icon(
+                    Icons.close_rounded,
+                    size: 17,
+                    color: FolktriColors.primaryIndigo,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
 
-                          IconButton(
-                            tooltip:
-                                'Post comment',
-                            onPressed:
-                                isPostingComment
-                                    ? null
-                                    : postComment,
-                            icon:
-                                isPostingComment
-                                    ? const SizedBox(
-                                        width:
-                                            20,
-                                        height:
-                                            20,
-                                        child:
-                                            CircularProgressIndicator(
-                                          strokeWidth:
-                                              2,
-                                        ),
-                                      )
-                                    : const Icon(
-                                        Icons
-                                            .send_rounded,
-                                        color:
-                                            FolktriColors
-                                                .primaryIndigo,
-                                      ),
-                          ),
-                        ],
-                      ),
+      // This is your ORIGINAL avatar + TextField + Send row.
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor:
+                FolktriColors.lightLavender,
+            backgroundImage:
+                profilePhotoUrl != null
+                    ? NetworkImage(
+                        profilePhotoUrl!,
+                      )
+                    : null,
+            child: profilePhotoUrl == null
+                ? const Icon(
+                    Icons.person_rounded,
+                    color:
+                        FolktriColors.primaryIndigo,
+                    size: 19,
+                  )
+                : null,
+          ),
+
+          const SizedBox(
+            width: 9,
+          ),
+
+          Expanded(
+            child: TextField(
+              controller: commentController,
+              focusNode: commentFocusNode,
+              minLines: 1,
+              maxLines: 4,
+              maxLength: 1000,
+              textCapitalization:
+                  TextCapitalization.sentences,
+              decoration: InputDecoration(
+                hintText:
+                    replyingToCommentId != null
+                        ? 'Add a reply...'
+                        : 'Add a comment...',
+                counterText: '',
+                filled: true,
+                fillColor:
+                    FolktriColors.background,
+                contentPadding:
+                    const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 11,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius:
+                      BorderRadius.circular(22),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(
+            width: 5,
+          ),
+
+          IconButton(
+            tooltip: replyingToCommentId != null
+                ? 'Post reply'
+                : 'Post comment',
+            onPressed:
+                isPostingComment
+                    ? null
+                    : postComment,
+            icon: isPostingComment
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child:
+                        CircularProgressIndicator(
+                      strokeWidth: 2,
                     ),
+                  )
+                : const Icon(
+                    Icons.send_rounded,
+                    color:
+                        FolktriColors.primaryIndigo,
+                  ),
+          ),
+        ],
+      ),
+    ],
+  ),
+),
                   ],
                 ),
               ),
@@ -1243,21 +2040,184 @@ Future<void> showPhotoComments(
     },
   );
 
-  commentController.dispose();
+  // commentController.dispose();
 
-  await loadPhotoCommentCounts();
+  // await loadPhotoCommentCounts();
 }
 
-Widget buildPhotoCommentTile({
+Widget buildPhotoCommentThread({
   required Map<String, dynamic>
       comment,
+  required List<Map<String, dynamic>>
+      replies,
   required String currentUserId,
+  required Map<String, int>
+      commentLikeCounts,
+  required Set<String>
+      likedCommentIds,
+  required Set<String>
+      updatingCommentLikeIds,
+  required Future<void> Function(
+    String commentId,
+  ) onLike,
+  required void Function(
+    String parentCommentId,
+    String displayName,
+  ) onReply,
   required Future<void> Function(
     String commentId,
   ) onDelete,
 }) {
+  final commentId =
+      comment['id']?.toString() ?? '';
+
   final profile =
       comment['profile'];
+
+  final firstName =
+      profile is Map
+          ? profile['first_name']
+                  ?.toString()
+                  .trim() ??
+              ''
+          : '';
+
+  final lastName =
+      profile is Map
+          ? profile['last_name']
+                  ?.toString()
+                  .trim() ??
+              ''
+          : '';
+
+  final displayName = [
+    firstName,
+    lastName,
+  ].where(
+    (name) => name.isNotEmpty,
+  ).join(' ');
+
+  final safeDisplayName =
+      displayName.isEmpty
+          ? 'Family member'
+          : displayName;
+
+  return Column(
+    crossAxisAlignment:
+        CrossAxisAlignment.start,
+    children: [
+      buildPhotoCommentTile(
+        comment: comment,
+        currentUserId:
+            currentUserId,
+        likeCount:
+            commentLikeCounts[
+                    commentId] ??
+                0,
+        isLiked:
+            likedCommentIds.contains(
+          commentId,
+        ),
+        isUpdatingLike:
+            updatingCommentLikeIds
+                .contains(
+          commentId,
+        ),
+        onLike: () {
+          onLike(commentId);
+        },
+        onReply: () {
+          onReply(
+            commentId,
+            safeDisplayName,
+          );
+        },
+        onDelete:
+            onDelete,
+      ),
+
+      if (replies.isNotEmpty)
+        Padding(
+          padding:
+              const EdgeInsets.only(
+            left: 38,
+          ),
+          child: Column(
+            children:
+                replies.map(
+              (reply) {
+                final replyId =
+                    reply['id']
+                            ?.toString() ??
+                        '';
+
+                return buildPhotoCommentTile(
+                  comment:
+                      reply,
+                  currentUserId:
+                      currentUserId,
+                  likeCount:
+                      commentLikeCounts[
+                              replyId] ??
+                          0,
+                  isLiked:
+                      likedCommentIds
+                          .contains(
+                    replyId,
+                  ),
+                  isUpdatingLike:
+                      updatingCommentLikeIds
+                          .contains(
+                    replyId,
+                  ),
+                  onLike: () {
+                    onLike(
+                      replyId,
+                    );
+                  },
+
+                  // Replying to a reply still
+                  // belongs to the parent thread.
+                  onReply: () {
+                    onReply(
+                      commentId,
+                      safeDisplayName,
+                    );
+                  },
+                  onDelete:
+                      onDelete,
+                  isReply: true,
+                );
+              },
+            ).toList(),
+          ),
+        ),
+    ],
+  );
+}
+
+Widget buildPhotoCommentTile({
+  required Map<String, dynamic> comment,
+  required String currentUserId,
+  required int likeCount,
+  required bool isLiked,
+  required bool isUpdatingLike,
+  required VoidCallback onLike,
+  required VoidCallback onReply,
+
+  required Future<void> Function(
+    String commentId,
+  ) onDelete,
+
+   bool isReply = false,
+}) {
+  final profile = comment['profile'];
+
+  final signedPhotoUrl =
+    profile is Map
+        ? profile['signed_photo_url']
+            ?.toString()
+        : null;
 
   final firstName =
       profile is Map
@@ -1298,8 +2258,7 @@ Widget buildPhotoCommentTile({
           '';
 
   final isOwnComment =
-      commentUserId ==
-          currentUserId;
+      commentUserId == currentUserId;
 
   final createdAt =
       DateTime.tryParse(
@@ -1348,24 +2307,32 @@ Widget buildPhotoCommentTile({
           CrossAxisAlignment.start,
       children: [
         CircleAvatar(
-          radius: 18,
-          backgroundColor:
-              FolktriColors
-                  .lightLavender,
-          child: Text(
-            firstName.isNotEmpty
-                ? firstName[0]
-                    .toUpperCase()
-                : '?',
-            style: const TextStyle(
-              color:
-                  FolktriColors
-                      .primaryIndigo,
-              fontWeight:
-                  FontWeight.bold,
-            ),
+  radius: 18,
+  backgroundColor:
+      FolktriColors.lightLavender,
+  backgroundImage:
+      signedPhotoUrl != null &&
+              signedPhotoUrl.isNotEmpty
+          ? NetworkImage(
+              signedPhotoUrl,
+            )
+          : null,
+  child: signedPhotoUrl == null ||
+          signedPhotoUrl.isEmpty
+      ? Text(
+          firstName.isNotEmpty
+              ? firstName[0]
+                  .toUpperCase()
+              : '?',
+          style: const TextStyle(
+            color:
+                FolktriColors.primaryIndigo,
+            fontWeight:
+                FontWeight.bold,
           ),
-        ),
+        )
+      : null,
+),
 
         const SizedBox(width: 10),
 
@@ -1394,6 +2361,8 @@ Widget buildPhotoCommentTile({
                   CrossAxisAlignment
                       .start,
               children: [
+                
+
                 Row(
                   children: [
                     Expanded(
@@ -1444,6 +2413,129 @@ Widget buildPhotoCommentTile({
                     height: 1.35,
                   ),
                 ),
+
+                const SizedBox(
+  height: 8,
+),
+
+Row(
+  mainAxisSize:
+      MainAxisSize.min,
+  children: [
+    InkWell(
+      borderRadius:
+          BorderRadius.circular(16),
+      onTap:
+          isUpdatingLike
+              ? null
+              : onLike,
+      child: Padding(
+        padding:
+            const EdgeInsets.symmetric(
+          horizontal: 2,
+          vertical: 3,
+        ),
+        child: Row(
+          mainAxisSize:
+              MainAxisSize.min,
+          children: [
+            if (isUpdatingLike)
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child:
+                    CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                ),
+              )
+            else
+              Icon(
+                isLiked
+                    ? Icons
+                        .favorite_rounded
+                    : Icons
+                        .favorite_border_rounded,
+                size: 16,
+                color: isLiked
+                    ? FolktriColors
+                        .dustyRose
+                    : FolktriColors
+                        .secondaryText,
+              ),
+
+            const SizedBox(
+              width: 5,
+            ),
+
+            Text(
+              likeCount == 0
+                  ? 'Like'
+                  : likeCount == 1
+                      ? '1 like'
+                      : '$likeCount likes',
+              style: TextStyle(
+                color: isLiked
+                    ? FolktriColors
+                        .dustyRose
+                    : FolktriColors
+                        .secondaryText,
+                fontSize: 11,
+                fontWeight:
+                    FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+
+    const SizedBox(
+      width: 14,
+    ),
+
+    InkWell(
+      borderRadius:
+          BorderRadius.circular(16),
+      onTap: onReply,
+      child: const Padding(
+        padding:
+            EdgeInsets.symmetric(
+          horizontal: 2,
+          vertical: 3,
+        ),
+        child: Row(
+          mainAxisSize:
+              MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.reply_rounded,
+              size: 16,
+              color:
+                  FolktriColors
+                      .secondaryText,
+            ),
+
+            SizedBox(
+              width: 4,
+            ),
+
+            Text(
+              'Reply',
+              style: TextStyle(
+                color:
+                    FolktriColors
+                        .secondaryText,
+                fontSize: 11,
+                fontWeight:
+                    FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  ],
+),
               ],
             ),
           ),
@@ -1546,6 +2638,11 @@ String childName = '';
   final photoId =
     photo['id']?.toString() ?? '';
 
+  final photoCardKey = 
+    photoCardKeys.putIfAbsent(photoId, () => GlobalKey(),);
+
+  final isHighlighted = highlightedPhotoId == photoId;
+
   final likeCount =
     photoLikeCounts[photoId] ?? 0;
 
@@ -1563,11 +2660,27 @@ String childName = '';
       ? 'Family photo'
       : '${createdAt.month}/${createdAt.day}/${createdAt.year}';
 
-  return Container(
+  return AnimatedContainer(
+
+    key: photoCardKey,
+    duration: const Duration(
+      milliseconds: 300,
+    ),
     margin: const EdgeInsets.only(bottom: 16),
     decoration: BoxDecoration(
-      color: FolktriColors.surface,
+      color: 
+        isHighlighted
+        ? FolktriColors.lightLavender
+            .withValues(alpha: 0.35)
+        : FolktriColors.surface,
       borderRadius: BorderRadius.circular(18),
+      border: isHighlighted
+        ? Border.all(
+            color:
+                FolktriColors.primaryIndigo,
+            width: 2,
+          )
+        : null,
       boxShadow: [
         BoxShadow(
           color: FolktriColors.midnightIndigo

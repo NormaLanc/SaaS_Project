@@ -88,6 +88,100 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 
+  Future<void> openNotification(
+  Map<String, dynamic> notification,
+) async {
+  final notificationId =
+      notification['id']?.toString() ?? '';
+
+  final type =
+      notification['type']?.toString() ?? '';
+
+  final familyId =
+      notification['family_id']?.toString() ?? '';
+
+  final referenceType =
+      notification['reference_type']
+              ?.toString() ??
+          '';
+
+  final referenceId =
+      notification['reference_id']
+              ?.toString() ??
+          '';
+
+  if (notificationId.isEmpty) {
+    return;
+  }
+
+  try {
+    // ==========================================
+    // MARK AS READ
+    // ==========================================
+    //
+    // Only the database update depends on
+    // whether this notification is unread.
+    //
+    // Navigation below happens EVERY time.
+
+    if (notification['is_read'] != true) {
+      await supabase
+          .from('Notifications')
+          .update({
+        'is_read': true,
+      }).eq(
+        'id',
+        notificationId,
+      );
+
+      if (mounted) {
+        setState(() {
+          notification['is_read'] = true;
+        });
+      }
+    }
+
+    if (!mounted) return;
+
+    // ==========================================
+    // OPEN PHOTO
+    // ==========================================
+
+    if (referenceType == 'photo' &&
+        referenceId.isNotEmpty &&
+        familyId.isNotEmpty) {
+      context.go(
+        Uri(
+          path: '/app',
+          queryParameters: {
+            'photoId': referenceId,
+          },
+        ).toString(),
+      );
+
+      return;
+    }
+
+    // ==========================================
+    // FAMILY JOIN REQUEST
+    // ==========================================
+
+    if (type == 'family_join_request') {
+      return;
+    }
+  } catch (e) {
+    debugPrint(
+      'OPEN NOTIFICATION ERROR: $e',
+    );
+
+    if (!mounted) return;
+
+    _showMessage(
+      'Unable to open this notification.',
+    );
+  }
+}
+
   Future<void> approveRequest(
     Map<String, dynamic> notification,
   ) async {
@@ -367,16 +461,21 @@ class _NotificationsPageState extends State<NotificationsPage> {
         ? Icons.group_add_rounded
         : Icons.notifications_none_rounded;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: FolktriColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isPending
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () {
+        openNotification(notification,);
+      },
+      child:  Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        decoration: BoxDecoration(
+          color: FolktriColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isPending
               ? FolktriColors.lightLavender
               : FolktriColors.background,
-        ),
+            ),
         boxShadow: [
           BoxShadow(
             color: FolktriColors.midnightIndigo
@@ -623,6 +722,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           ],
         ),
       ),
+    ),
     );
   }
 
