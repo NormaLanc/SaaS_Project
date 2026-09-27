@@ -192,9 +192,14 @@ GoRoute(
         state.pathParameters[
             'childId']!;
 
+    final mediaType =
+        state.uri.queryParameters['type'] ??
+            'photo';
+
     return AddPhotoPage(
       familyId: familyId,
       childId: childId,
+      mediaType: mediaType,
     );
   },
 ),

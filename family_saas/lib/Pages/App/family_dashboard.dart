@@ -37,6 +37,12 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
   Map<String, int> photoLikeCounts = {};
   Set<String> likedPhotoIds = {};
 
+  Map<String, int> postLikeCounts = {};
+
+  Set<String> likedPostIds = {};
+
+  bool isUpdatingPostLike = false;
+
   bool isUpdatingLike = false;
 
   Map<String, int> photoCommentCounts = {};
@@ -56,13 +62,54 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
 
   bool isLoadingProfile = true;
 
+  final quickPostController = TextEditingController();
+
+  bool isPostingQuickPost = false;
+
   @override
   void initState() {
     super.initState();
-    checkFamilyMembership();
-    loadFeed();
-    loadUpcomingEvents();
-    loadUserProfile();
+
+   quickPostController.addListener(
+      _onQuickPostChanged,
+    );
+
+    _initializeDashboard();
+
+    // checkFamilyMembership();
+    // loadFeed();
+    // loadUpcomingEvents();
+    // loadUserProfile();
+   
+  }
+
+  Future<void> _initializeDashboard() async {
+    await checkFamilyMembership();
+
+    if (!mounted) return;
+
+    await Future.wait([
+      loadFeed(),
+      loadUpcomingEvents(),
+      loadUserProfile(),
+    ]);
+  }
+
+  void _onQuickPostChanged() {
+    if (!mounted) return;
+
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    quickPostController.removeListener(
+      _onQuickPostChanged,
+    );
+
+    quickPostController.dispose();
+
+    super.dispose();
   }
 
 Future<void> checkFamilyMembership() async {
@@ -291,35 +338,25 @@ void showFamilyOptions() {
   }
 
 Future<void> loadFeed() async {
-  try {
-    final user = supabase.auth.currentUser;
+
+   try {
+    final user =
+        supabase.auth.currentUser;
 
     if (user == null) {
       return;
     }
 
-    final membershipResponse = await supabase
-        .from('Family_Members')
-        .select('family_id')
-        .eq('user_id', user.id)
-        .eq('status', 'approved');
+    // The Dashboard feed should only show
+    // activity for the family currently
+    // selected at the top of the Dashboard.
+    final familyId =
+        selectedFamilyId;
 
-    final memberships =
-        List<Map<String, dynamic>>.from(
-      membershipResponse,
-    );
-
-    final familyIds = memberships
-        .map(
-          (membership) =>
-              membership['family_id'],
-        )
-        .where(
-          (id) => id != null,
-        )
-        .toList();
-
-    if (familyIds.isEmpty) {
+    // If a family has not been selected yet,
+    // there is nothing to load.
+    if (familyId == null ||
+        familyId.isEmpty) {
       if (!mounted) return;
 
       setState(() {
@@ -330,60 +367,205 @@ Future<void> loadFeed() async {
       return;
     }
 
-    final milestoneResponse = await supabase
-        .from('Milestones')
-        .select(
-          '''
-          id,
-          family_id,
-          child_id,
-          title,
-          description,
-          milestone_date,
-          photo_url,
-          created_at,
-          Children(
-            first_name,
-            middle_name,
-            last_name
-          )
-          ''',
-        )
-        .inFilter(
-          'family_id',
-          familyIds,
-        )
-        .order(
-          'created_at',
-          ascending: false,
-        );
+    // Show the loading indicator while
+    // switching/reloading families.
+    if (mounted) {
+      setState(() {
+        isLoadingFeed = true;
+      });
+    }
 
-    final photoResponse = await supabase
-    .from('Photos')
-    .select(
-      '''
-      id,
-      family_id,
-      child_id,
-      photo_url,
-      caption,
-      created_at,
-      Children(
-        first_name,
-        middle_name,
-        last_name
-      )
-      ''',
-    )
-    .inFilter(
-      'family_id',
-      familyIds,
-    )
-    .order(
-      'created_at',
-      ascending: false,
-    );
+    // Your existing queries below use
+    // .inFilter('family_id', familyIds),
+    // so we keep familyIds as a List,
+    // but it now contains ONLY the
+    // selected family.
+    final familyIds = <String>[
+      familyId,
+    ];
+  // try {
+  //   final user =
+  //       supabase.auth.currentUser;
 
+  //   if (user == null) {
+  //     return;
+  //   }
+
+  //   // --------------------------------------------------
+  //   // 1. Get families this user owns.
+  //   // --------------------------------------------------
+
+  //   final ownedFamilyResponse =
+  //       await supabase
+  //           .from('Families')
+  //           .select('id')
+  //           .eq(
+  //             'created_by',
+  //             user.id,
+  //           );
+
+  //   final ownedFamilies =
+  //       List<Map<String, dynamic>>.from(
+  //     ownedFamilyResponse,
+  //   );
+
+  //   // --------------------------------------------------
+  //   // 2. Get families this user has joined.
+  //   // --------------------------------------------------
+
+  //   final membershipResponse =
+  //       await supabase
+  //           .from('Family_Members')
+  //           .select('family_id')
+  //           .eq(
+  //             'user_id',
+  //             user.id,
+  //           )
+  //           .eq(
+  //             'status',
+  //             'approved',
+  //           );
+
+  //   final memberships =
+  //       List<Map<String, dynamic>>.from(
+  //     membershipResponse,
+  //   );
+
+  //   // Use a Set so the same family cannot
+  //   // appear twice if the owner also has a
+  //   // Family_Members row.
+  //   final familyIdSet = <String>{};
+
+  //   for (final family
+  //       in ownedFamilies) {
+  //     final familyId =
+  //         family['id']?.toString();
+
+  //     if (familyId != null &&
+  //         familyId.isNotEmpty) {
+  //       familyIdSet.add(
+  //         familyId,
+  //       );
+  //     }
+  //   }
+
+  //   for (final membership
+  //       in memberships) {
+  //     final familyId =
+  //         membership['family_id']
+  //             ?.toString();
+
+  //     if (familyId != null &&
+  //         familyId.isNotEmpty) {
+  //       familyIdSet.add(
+  //         familyId,
+  //       );
+  //     }
+  //   }
+
+  //   final familyIds =
+  //       familyIdSet.toList();
+
+  //   if (familyIds.isEmpty) {
+  //     if (!mounted) return;
+
+  //     setState(() {
+  //       feedItems = [];
+  //       isLoadingFeed = false;
+  //     });
+
+  //     return;
+  //   }
+
+    // --------------------------------------------------
+    // 3. Load milestones.
+    // --------------------------------------------------
+
+    final milestoneResponse =
+        await supabase
+            .from('Milestones')
+            .select(
+              '''
+              id,
+              family_id,
+              child_id,
+              title,
+              description,
+              milestone_date,
+              photo_url,
+              created_at,
+              Children(
+                first_name,
+                middle_name,
+                last_name
+              )
+              ''',
+            )
+            .inFilter(
+              'family_id',
+              familyIds,
+            )
+            .order(
+              'created_at',
+              ascending: false,
+            );
+
+    // --------------------------------------------------
+    // 4. Load photos/videos.
+    // --------------------------------------------------
+
+    final photoResponse =
+        await supabase
+            .from('Photos')
+            .select(
+              '''
+              id,
+              family_id,
+              child_id,
+              photo_url,
+              caption,
+              media_type,
+              created_at,
+              Children(
+                first_name,
+                middle_name,
+                last_name
+              )
+              ''',
+            )
+            .inFilter(
+              'family_id',
+              familyIds,
+            )
+            .order(
+              'created_at',
+              ascending: false,
+            );
+
+    // --------------------------------------------------
+    // 5. Load family-board text posts.
+    // --------------------------------------------------
+
+    final postResponse =
+        await supabase
+            .from('Family_Posts')
+            .select(
+              '''
+              id,
+              family_id,
+              created_by,
+              post_text,
+              created_at
+              ''',
+            )
+            .inFilter(
+              'family_id',
+              familyIds,
+            )
+            .order(
+              'created_at',
+              ascending: false,
+            );
 
     final photos =
         List<Map<String, dynamic>>.from(
@@ -395,72 +577,213 @@ Future<void> loadFeed() async {
       milestoneResponse,
     );
 
-    final milestoneFeed = milestones.map(
+    final posts =
+        List<Map<String, dynamic>>.from(
+      postResponse,
+    );
+
+    final postAuthorIds = posts
+    .map(
+      (post) =>
+          post['created_by']
+              ?.toString(),
+    )
+    .whereType<String>()
+    .where(
+      (id) => id.isNotEmpty,
+    )
+    .toSet()
+    .toList();
+
+final Map<String, Map<String, dynamic>>
+    postAuthorProfiles = {};
+
+if (postAuthorIds.isNotEmpty) {
+  final profileResponse =
+      await supabase
+          .from('Profiles')
+          .select(
+            '''
+            user_id,
+            first_name,
+            last_name,
+            profile_photo_path
+            ''',
+          )
+          .inFilter(
+            'user_id',
+            postAuthorIds,
+          );
+
+  final profiles =
+      List<Map<String, dynamic>>.from(
+    profileResponse,
+  );
+
+  for (final profile in profiles) {
+    final userId =
+        profile['user_id']
+            ?.toString();
+
+    if (userId != null &&
+        userId.isNotEmpty) {
+      postAuthorProfiles[userId] =
+          profile;
+    }
+  }
+}
+
+    // --------------------------------------------------
+    // 6. Convert milestones into feed items.
+    // --------------------------------------------------
+
+    final milestoneFeed =
+        milestones.map(
       (milestone) {
-        return {
-          'type': 'milestone',
-          'id': milestone['id'],
-          'family_id': milestone['family_id'],
-          'child_id': milestone['child_id'],
-          'title': milestone['title'],
-          'description': milestone['description'],
-          'photo_url': milestone['photo_url'],
-          'event_date': milestone['milestone_date'],
-          'created_at': milestone['created_at'],
-          'child': milestone['Children'],
+        return <String, dynamic>{
+          'type':
+              'milestone',
+          'id':
+              milestone['id'],
+          'family_id':
+              milestone['family_id'],
+          'child_id':
+              milestone['child_id'],
+          'title':
+              milestone['title'],
+          'description':
+              milestone['description'],
+          'photo_url':
+              milestone['photo_url'],
+          'event_date':
+              milestone[
+                  'milestone_date'],
+          'created_at':
+              milestone['created_at'],
+          'child':
+              milestone['Children'],
         };
       },
     ).toList();
 
-    final photoFeed = photos.map(
+    // --------------------------------------------------
+    // 7. Convert photos/videos into feed items.
+    // --------------------------------------------------
+
+    final photoFeed =
+        photos.map(
       (photo) {
-        return {
-          'type': 'photo',
-          'id': photo['id'],
-          'family_id': photo['family_id'],
-          'child_id': photo['child_id'],
-          'photo_url': photo['photo_url'],
-          'caption': photo['caption'],
-          'created_at': photo['created_at'],
-          'child': photo['Children'],
+        return <String, dynamic>{
+          'type':
+              'photo',
+          'id':
+              photo['id'],
+          'family_id':
+              photo['family_id'],
+          'child_id':
+              photo['child_id'],
+          'photo_url':
+              photo['photo_url'],
+          'caption':
+              photo['caption'],
+          'media_type':
+              photo['media_type'] ??
+                  'photo',
+          'created_at':
+              photo['created_at'],
+          'child':
+              photo['Children'],
         };
       },
     ).toList();
-    
-    final combinedFeed = [
+
+    // --------------------------------------------------
+    // 8. Convert text posts into feed items.
+    // --------------------------------------------------
+
+    final postFeed =
+    posts.map(
+  (post) {
+    final String? createdBy =
+        post['created_by']
+            ?.toString();
+
+    return <String, dynamic>{
+      'type': 'post',
+
+      'id':
+          post['id'],
+
+      'family_id':
+          post['family_id'],
+
+      'created_by':
+          post['created_by'],
+
+      'post_text':
+          post['post_text'],
+
+      'created_at':
+          post['created_at'],
+
+      'author':
+          createdBy == null ||
+                  createdBy.isEmpty
+              ? null
+              : postAuthorProfiles[
+                  createdBy],
+    };
+  },
+).toList();
+
+    // --------------------------------------------------
+    // 9. Combine everything.
+    // --------------------------------------------------
+
+    final combinedFeed =
+        <Map<String, dynamic>>[
       ...milestoneFeed,
       ...photoFeed,
+      ...postFeed,
     ];
 
     combinedFeed.sort(
       (a, b) {
         final aDate =
-          DateTime.parse(
-            a['created_at']
+            DateTime.parse(
+          a['created_at']
               .toString(),
-          );
+        );
 
         final bDate =
-          DateTime.parse(
-            b['created_at']
+            DateTime.parse(
+          b['created_at']
               .toString(),
-          );
+        );
 
-    return bDate.compareTo(
-      aDate,
+        return bDate.compareTo(
+          aDate,
+        );
+      },
     );
-  },
-);
 
     if (!mounted) return;
 
     setState(() {
-      feedItems = combinedFeed;
-      isLoadingFeed = false;
+      feedItems =
+          combinedFeed;
+
+      isLoadingFeed =
+          false;
     });
 
+    // KEEP your existing photo
+    // interaction loading.
     await loadPhotoLikes();
+
     await loadPhotoCommentCounts();
+
+    await loadPostLikes();
 
     await scrollToTargetPhoto();
   } catch (e) {
@@ -638,6 +961,102 @@ Future<void> loadPhotoLikes() async {
   } catch (e) {
     debugPrint(
       'Unable to load photo likes: $e',
+    );
+  }
+}
+
+Future<void> loadPostLikes() async {
+  final user =
+      supabase.auth.currentUser;
+
+  if (user == null) return;
+
+  final postIds = feedItems
+      .where(
+        (item) =>
+            item['type'] == 'post',
+      )
+      .map(
+        (item) =>
+            item['id']?.toString(),
+      )
+      .whereType<String>()
+      .where(
+        (id) => id.isNotEmpty,
+      )
+      .toList();
+
+  if (postIds.isEmpty) {
+    if (!mounted) return;
+
+    setState(() {
+      postLikeCounts = {};
+      likedPostIds = {};
+    });
+
+    return;
+  }
+
+  try {
+    final response =
+        await supabase
+            .from(
+              'Family_Post_Likes',
+            )
+            .select(
+              'post_id, user_id',
+            )
+            .inFilter(
+              'post_id',
+              postIds,
+            );
+
+    final likes =
+        List<Map<String, dynamic>>.from(
+      response,
+    );
+
+    final counts =
+        <String, int>{};
+
+    final likedByUser =
+        <String>{};
+
+    for (final like in likes) {
+      final postId =
+          like['post_id']
+              ?.toString();
+
+      final userId =
+          like['user_id']
+              ?.toString();
+
+      if (postId == null) {
+        continue;
+      }
+
+      counts[postId] =
+          (counts[postId] ?? 0) + 1;
+
+      if (userId == user.id) {
+        likedByUser.add(
+          postId,
+        );
+      }
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      postLikeCounts =
+          counts;
+
+      likedPostIds =
+          likedByUser;
+    });
+  } catch (e) {
+    debugPrint(
+      'Unable to load family post likes: $e',
     );
   }
 }
@@ -887,6 +1306,110 @@ Future<void> togglePhotoLike(String photoId,) async {
     if (mounted) {
       setState(() {
         isUpdatingLike = false;
+      });
+    }
+  }
+}
+
+Future<void> togglePostLike(
+  String postId,
+) async {
+  final user =
+      supabase.auth.currentUser;
+
+  if (user == null ||
+      isUpdatingPostLike) {
+    return;
+  }
+
+  final wasLiked =
+      likedPostIds.contains(
+    postId,
+  );
+
+  try {
+    setState(() {
+      isUpdatingPostLike = true;
+    });
+
+    if (wasLiked) {
+      await supabase
+          .from(
+            'Family_Post_Likes',
+          )
+          .delete()
+          .eq(
+            'post_id',
+            postId,
+          )
+          .eq(
+            'user_id',
+            user.id,
+          );
+
+      if (!mounted) return;
+
+      setState(() {
+        likedPostIds.remove(
+          postId,
+        );
+
+        final current =
+            postLikeCounts[
+                    postId] ??
+                0;
+
+        postLikeCounts[postId] =
+            current > 0
+                ? current - 1
+                : 0;
+      });
+    } else {
+      await supabase
+          .from(
+            'Family_Post_Likes',
+          )
+          .insert({
+            'post_id':
+                postId,
+            'user_id':
+                user.id,
+          });
+
+      if (!mounted) return;
+
+      setState(() {
+        likedPostIds.add(
+          postId,
+        );
+
+        postLikeCounts[postId] =
+            (postLikeCounts[
+                        postId] ??
+                    0) +
+                1;
+      });
+    }
+  } catch (e) {
+    debugPrint(
+      'Unable to update family post like: $e',
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Unable to update like.',
+        ),
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() {
+        isUpdatingPostLike =
+            false;
       });
     }
   }
@@ -1335,7 +1858,7 @@ Future<void> showPhotoComments(String photoId) async {
               }
             }
 
-            Future<void> toggleCommentLike(String commentId,) async {
+          Future<void> toggleCommentLike(String commentId,) async {
   if (commentId.isEmpty ||
       updatingCommentLikeIds
           .contains(commentId)) {
@@ -2039,7 +2562,7 @@ Future<void> showPhotoComments(String photoId) async {
       );
     },
   );
-
+  // quickPostController.dispose();
   // commentController.dispose();
 
   // await loadPhotoCommentCounts();
@@ -2607,7 +3130,310 @@ Widget buildFeedItem(
     );
   }
 
+  if (type == 'post') {
+    return buildFamilyPostCard(
+      item,
+    );
+  }
+
   return const SizedBox.shrink();
+}
+
+Widget buildFamilyPostCard(Map<String, dynamic> post,) {
+
+  final postId =
+    post['id']
+            ?.toString() ??
+        '';
+
+  final isLiked =
+    likedPostIds.contains(
+      postId,
+    );
+
+  final likeCount = postLikeCounts[postId] ?? 0;
+
+  final postText =
+      post['post_text']
+              ?.toString()
+              .trim() ??
+          '';
+
+  final author =
+    post['author']
+        as Map<String, dynamic>?;
+
+  final firstName =
+    author?['first_name']
+            ?.toString()
+            .trim() ??
+        '';
+
+  final lastName =
+    author?['last_name']
+            ?.toString()
+            .trim() ??
+        '';
+
+  final authorName = [
+    firstName,
+    lastName,
+  ]
+    .where(
+      (name) =>
+          name.isNotEmpty,
+    )
+    .join(' ');
+
+  final authorPhotoPath =
+    author?['profile_photo_path']
+        ?.toString();
+
+  final createdAt =
+      DateTime.tryParse(
+    post['created_at']
+            ?.toString() ??
+        '',
+  );
+
+  String timeText = '';
+
+  if (createdAt != null) {
+    final localDate =
+        createdAt.toLocal();
+
+    timeText =
+        '${localDate.month}/'
+        '${localDate.day}/'
+        '${localDate.year}';
+  }
+
+  return Container(
+    margin:
+        const EdgeInsets.only(
+      bottom: 14,
+    ),
+    padding:
+        const EdgeInsets.all(
+      16,
+    ),
+    decoration:
+        BoxDecoration(
+      color:
+          FolktriColors.surface,
+      borderRadius:
+          BorderRadius.circular(
+        18,
+      ),
+      border:
+          Border.all(
+        color:
+            FolktriColors
+                .lightLavender,
+      ),
+      boxShadow: [
+        BoxShadow(
+          color:
+              FolktriColors
+                  .midnightIndigo
+                  .withValues(
+                    alpha: 0.035,
+                  ),
+          blurRadius: 12,
+          offset:
+              const Offset(
+            0,
+            4,
+          ),
+        ),
+      ],
+    ),
+    child:
+        Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+           CircleAvatar(
+            radius: 21,
+            backgroundColor: FolktriColors.lightLavender,
+            backgroundImage: authorPhotoPath != null &&
+              authorPhotoPath.isNotEmpty
+              ? NetworkImage(authorPhotoPath,)
+              : null,
+            child: authorPhotoPath == null || authorPhotoPath.isEmpty
+              ? const Icon(
+                Icons.person_rounded,
+                color: FolktriColors.primaryIndigo,
+              )
+              : null,
+            ),
+
+            const SizedBox(width: 11,),
+
+            Expanded(
+              child:
+                  Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment
+                        .start,
+                children: [
+                  Text(
+                    authorName.isEmpty
+                    ? 'Family member'
+                    : authorName,
+                    style: const TextStyle(
+                      color:FolktriColors.primaryText,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+
+                  if (timeText
+                      .isNotEmpty)
+                    Text(
+                      timeText,
+                      style:
+                          const TextStyle(
+                        color:
+                            FolktriColors
+                                .secondaryText,
+                        fontSize:
+                            11,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(
+          height: 14,
+        ),
+
+        Text(
+          postText,
+          style:
+              const TextStyle(
+            color:
+                FolktriColors
+                    .primaryText,
+            fontSize:
+                15,
+            height:
+                1.45,
+          ),
+        ),
+
+        const SizedBox(
+          height: 14,
+        ),
+
+        const Divider(
+          height: 1,
+          color:
+              FolktriColors
+                  .lightLavender,
+        ),
+
+        const SizedBox(
+          height: 10,
+        ),
+
+        Row(
+  children: [
+    InkWell(
+      borderRadius:
+          BorderRadius.circular(20),
+      onTap:
+          postId.isEmpty
+              ? null
+              : () {
+                  togglePostLike(
+                    postId,
+                  );
+                },
+      child: Padding(
+        padding:
+            const EdgeInsets.symmetric(
+          vertical: 6,
+          horizontal: 4,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isLiked
+                  ? Icons
+                      .favorite_rounded
+                  : Icons
+                      .favorite_border_rounded,
+              size: 20,
+              color: isLiked
+                  ? FolktriColors
+                      .dustyRose
+                  : FolktriColors
+                      .secondaryText,
+            ),
+
+            const SizedBox(
+              width: 6,
+            ),
+
+            Text(
+              likeCount > 0
+                  ? '$likeCount'
+                  : 'Like',
+              style:
+                  TextStyle(
+                color: isLiked
+                    ? FolktriColors
+                        .dustyRose
+                    : FolktriColors
+                        .secondaryText,
+                fontSize: 12,
+                fontWeight:
+                    FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+
+    const SizedBox(
+      width: 22,
+    ),
+
+    const Icon(
+      Icons
+          .chat_bubble_outline_rounded,
+      size: 19,
+      color:
+          FolktriColors.secondaryText,
+    ),
+
+    const SizedBox(
+      width: 6,
+    ),
+
+    const Text(
+      'Comment',
+      style:
+          TextStyle(
+        color:
+            FolktriColors.secondaryText,
+        fontSize: 12,
+        fontWeight:
+            FontWeight.w600,
+      ),
+    ),
+  ],
+)
+      ],
+    ),
+  );
 }
 
 Widget buildPhotoFeedCard( Map<String, dynamic> photo) {
@@ -3813,15 +4639,27 @@ Widget buildFamilySelector() {
             Icons.keyboard_arrow_down_rounded,
             color: FolktriColors.midnightIndigo,
           ),
-          onSelected: (value) {
+          onSelected: (value) async {
             if (value == 'add') {
               showFamilyOptions();
               return;
             }
 
+            if (value == selectedFamilyId) {
+              return;
+            }
+
             setState(() {
               selectedFamilyId = value;
+              feedItems = [];
+              isLoadingFeed = true;
             });
+
+            await loadFeed();
+
+            if (!mounted) return;
+
+            await loadUpcomingEvents();
           },
           itemBuilder: (context) => [
             ...families.map(
@@ -3845,7 +4683,493 @@ Widget buildFamilySelector() {
   );
 }
 
+Future<String?> _chooseChildForPost({
+  required String familyId,
+  required String actionLabel,
+}) async {
+  try {
+    final response = await supabase
+        .from('Children')
+        .select(
+          '''
+          id,
+          first_name,
+          middle_name,
+          last_name
+          ''',
+        )
+        .eq(
+          'family_id',
+          familyId,
+        )
+        .order(
+          'first_name',
+        );
+
+    final children =
+        List<Map<String, dynamic>>.from(
+      response,
+    );
+
+    if (!mounted) return null;
+
+    if (children.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: Text(
+            'Add a child to this family before adding a $actionLabel.',
+          ),
+        ),
+      );
+
+      return null;
+    }
+
+    // No need to make the user choose if
+    // this family only has one child.
+    if (children.length == 1) {
+      return children.first['id']
+          ?.toString();
+    }
+
+    return showModalBottomSheet<String>(
+      context: context,
+      backgroundColor:
+          FolktriColors.surface,
+      showDragHandle: true,
+      shape:
+          const RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.vertical(
+          top: Radius.circular(24),
+        ),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding:
+                const EdgeInsets.fromLTRB(
+              20,
+              4,
+              20,
+              24,
+            ),
+            child: Column(
+              mainAxisSize:
+                  MainAxisSize.min,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Add $actionLabel for...',
+                  style: const TextStyle(
+                    color: FolktriColors
+                        .midnightIndigo,
+                    fontSize: 21,
+                    fontWeight:
+                        FontWeight.w800,
+                  ),
+                ),
+
+                const SizedBox(height: 5),
+
+                const Text(
+                  'Choose a child in this family.',
+                  style: TextStyle(
+                    color: FolktriColors
+                        .secondaryText,
+                    fontSize: 13,
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                ...children.map(
+                  (child) {
+                    final childId =
+                        child['id']
+                                ?.toString() ??
+                            '';
+
+                    final name = [
+                      child['first_name'],
+                      child['middle_name'],
+                      child['last_name'],
+                    ]
+                        .where(
+                          (value) =>
+                              value != null &&
+                              value
+                                  .toString()
+                                  .trim()
+                                  .isNotEmpty,
+                        )
+                        .join(' ');
+
+                    return Padding(
+                      padding:
+                          const EdgeInsets.only(
+                        bottom: 8,
+                      ),
+                      child: InkWell(
+                        borderRadius:
+                            BorderRadius.circular(
+                          16,
+                        ),
+                        onTap: childId.isEmpty
+                            ? null
+                            : () {
+                                Navigator.pop(
+                                  sheetContext,
+                                  childId,
+                                );
+                              },
+                        child: Container(
+                          padding:
+                              const EdgeInsets.all(
+                            14,
+                          ),
+                          decoration:
+                              BoxDecoration(
+                            color:
+                                FolktriColors
+                                    .background,
+                            borderRadius:
+                                BorderRadius
+                                    .circular(
+                              16,
+                            ),
+                            border: Border.all(
+                              color:
+                                  FolktriColors
+                                      .lightLavender,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration:
+                                    const BoxDecoration(
+                                  color:
+                                      FolktriColors
+                                          .lightLavender,
+                                  shape:
+                                      BoxShape.circle,
+                                ),
+                                child:
+                                    const Icon(
+                                  Icons
+                                      .child_care_rounded,
+                                  color:
+                                      FolktriColors
+                                          .primaryIndigo,
+                                ),
+                              ),
+
+                              const SizedBox(
+                                width: 12,
+                              ),
+
+                              Expanded(
+                                child: Text(
+                                  name.isEmpty
+                                      ? 'Child'
+                                      : name,
+                                  style:
+                                      const TextStyle(
+                                    color:
+                                        FolktriColors
+                                            .primaryText,
+                                    fontWeight:
+                                        FontWeight
+                                            .w700,
+                                  ),
+                                ),
+                              ),
+
+                              const Icon(
+                                Icons
+                                    .chevron_right_rounded,
+                                color:
+                                    FolktriColors
+                                        .secondaryText,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  } catch (e) {
+    debugPrint(
+      'Unable to load children for quick post: $e',
+    );
+
+    if (!mounted) return null;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Unable to load the children in this family.',
+        ),
+      ),
+    );
+
+    return null;
+  }
+}
+
+Future<void> _openQuickPhotoPost(
+  String familyId,
+) async {
+  final childId =
+      await _chooseChildForPost(
+    familyId: familyId,
+    actionLabel: 'photo',
+  );
+
+  if (childId == null ||
+      childId.isEmpty ||
+      !mounted) {
+    return;
+  }
+
+  final result = await context.push(
+    '/family/$familyId/child/$childId/add-photo',
+  );
+
+  if (!mounted) return;
+
+  // Refresh the Dashboard so the newly
+  // uploaded photo appears immediately.
+  await loadFeed();
+
+  if (result == true) {
+    debugPrint(
+      'Quick photo post completed.',
+    );
+  }
+}
+
+Future<void> _openQuickVideoPost(
+  String familyId,
+) async {
+  final childId =
+      await _chooseChildForPost(
+    familyId: familyId,
+    actionLabel: 'video',
+  );
+
+  if (childId == null ||
+      childId.isEmpty ||
+      !mounted) {
+    return;
+  }
+
+  await context.push(
+    Uri(
+      path:
+          '/family/$familyId/child/$childId/add-photo',
+      queryParameters: {
+        'type': 'video',
+      },
+    ).toString(),
+  );
+
+  if (!mounted) return;
+
+  await loadFeed();
+}
+
+Future<void> _openQuickMilestonePost(
+  String familyId,
+) async {
+  final childId =
+      await _chooseChildForPost(
+    familyId: familyId,
+    actionLabel: 'milestone',
+  );
+
+  if (childId == null ||
+      childId.isEmpty ||
+      !mounted) {
+    return;
+  }
+
+  final result = await context.push(
+    '/family/$familyId/child/$childId/add-milestone',
+  );
+
+  if (!mounted) return;
+
+  await loadFeed();
+
+  if (result == true) {
+    debugPrint(
+      'Quick milestone post completed.',
+    );
+  }
+}
+
+Future<void> _openQuickEventPost(
+  String familyId,
+) async {
+  await context.push(
+    '/family/$familyId/calendar/add-event',
+  );
+
+  if (!mounted) return;
+
+  await loadUpcomingEvents();
+}
+
+Future<void> _handleQuickPost(
+  String type,
+) async {
+  final familyId =
+      selectedFamilyId;
+
+  if (familyId == null ||
+      familyId.isEmpty) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Please select a family first.',
+        ),
+      ),
+    );
+
+    return;
+  }
+
+  switch (type) {
+    case 'photo':
+      await _openQuickPhotoPost(
+        familyId,
+      );
+      break;
+
+    case 'event':
+      await _openQuickEventPost(
+        familyId,
+      );
+      break;
+
+    case 'milestone':
+      await _openQuickMilestonePost(
+        familyId,
+      );
+      break;
+
+    case 'video':
+      await _openQuickVideoPost(
+        familyId,
+      );
+      break;
+  }
+}
+
+Future<void> _submitQuickPost() async {
+  final user =
+      supabase.auth.currentUser;
+
+  final familyId =
+      selectedFamilyId;
+
+  final text =
+      quickPostController.text.trim();
+
+  if (user == null ||
+      familyId == null ||
+      familyId.isEmpty ||
+      text.isEmpty ||
+      isPostingQuickPost) {
+    return;
+  }
+
+  try {
+    setState(() {
+      isPostingQuickPost = true;
+    });
+
+    await supabase
+        .from('Family_Posts')
+        .insert({
+          'family_id':
+              familyId,
+          'created_by':
+              user.id,
+          'post_text':
+              text,
+        });
+
+    quickPostController.clear();
+
+    FocusScope.of(context)
+        .unfocus();
+
+    // Reload the combined family feed.
+    await loadFeed();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Posted to your family.',
+        ),
+      ),
+    );
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(
+          'Unable to create post: $e',
+        ),
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() {
+        isPostingQuickPost = false;
+      });
+    }
+  }
+}
+
 Widget buildQuickPostCard() {
+  final selectedFamily = families
+      .where(
+        (family) =>
+            family['id']?.toString() ==
+            selectedFamilyId,
+      )
+      .cast<Map<String, dynamic>>()
+      .firstOrNull;
+
+  final familyName =
+      selectedFamily?['family_name']
+              ?.toString()
+              .trim() ??
+          '';
+
   return Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
@@ -3854,89 +5178,219 @@ Widget buildQuickPostCard() {
       border: Border.all(
         color: FolktriColors.lightLavender,
       ),
+      boxShadow: [
+        BoxShadow(
+          color: FolktriColors.midnightIndigo
+              .withValues(alpha: 0.035),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
     ),
     child: Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
       children: [
+        // ==========================================
+        // COMPOSER
+        // ==========================================
+
         Row(
           children: [
             CircleAvatar(
-              radius: 19,
-              backgroundColor: FolktriColors.lightLavender,
-              backgroundImage: profilePhotoUrl != null
-                  ? NetworkImage(profilePhotoUrl!)
-                  : null,
+              radius: 20,
+              backgroundColor:
+                  FolktriColors.lightLavender,
+              backgroundImage:
+                  profilePhotoUrl != null
+                      ? NetworkImage(
+                          profilePhotoUrl!,
+                        )
+                      : null,
               child: profilePhotoUrl == null
                   ? const Icon(
                       Icons.person_rounded,
-                      color: FolktriColors.primaryIndigo,
+                      color: FolktriColors
+                          .primaryIndigo,
                     )
                   : null,
             ),
 
             const SizedBox(width: 10),
 
-            Expanded(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(24),
-                onTap: () {
-                  _showPostOptions();
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 13,
-                  ),
-                  decoration: BoxDecoration(
-                    color: FolktriColors.background,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: FolktriColors.lightLavender,
-                    ),
-                  ),
-                  child: const Text(
-                    'Share a moment with your family...',
-                    style: TextStyle(
-                      color: FolktriColors.secondaryText,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+           Expanded(
+  child: TextField(
+    controller:
+        quickPostController,
+    minLines: 1,
+    maxLines: 5,
+    maxLength: 2000,
+    textCapitalization:
+        TextCapitalization.sentences,
+    decoration: InputDecoration(
+      hintText:
+          familyName.isEmpty
+              ? 'Share something with your family...'
+              : 'Share something with $familyName...',
+      hintStyle: const TextStyle(
+        color:
+            FolktriColors.secondaryText,
+        fontSize: 13,
+      ),
+      counterText: '',
+      filled: true,
+      fillColor:
+          FolktriColors.background,
+      contentPadding:
+          const EdgeInsets.symmetric(
+        horizontal: 15,
+        vertical: 12,
+      ),
+      enabledBorder:
+          OutlineInputBorder(
+        borderRadius:
+            BorderRadius.circular(20),
+        borderSide:
+            const BorderSide(
+          color:
+              FolktriColors.lightLavender,
+        ),
+      ),
+      focusedBorder:
+          OutlineInputBorder(
+        borderRadius:
+            BorderRadius.circular(20),
+        borderSide:
+            const BorderSide(
+          color:
+              FolktriColors.primaryIndigo,
+          width: 1.3,
+        ),
+      ),
+    ),
+  ),
+),
           ],
         ),
 
-        const SizedBox(height: 12),
+        //const SizedBox(height: 12),
+
+    //     if (quickPostController
+    // .text
+    // .trim()
+    // .isNotEmpty) ...[
+  const SizedBox(height: 10),
+
+  Align(
+    alignment: Alignment.centerRight,
+    child: SizedBox(
+      height: 38,
+      child: ElevatedButton(
+        onPressed: quickPostController.text
+                .trim()
+                .isEmpty || isPostingQuickPost
+                ? null
+                : _submitQuickPost,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: FolktriColors.primaryIndigo,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 20,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+        ),
+        child: isPostingQuickPost
+            ? const SizedBox(
+                width: 17,
+                height: 17,
+                child:
+                    CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Text(
+                'Post',
+                style: TextStyle(
+                  fontWeight:
+                      FontWeight.w700,
+                ),
+              ),
+      ),
+    ),
+  ),
+//],
 
         const Divider(
           height: 1,
           color: FolktriColors.lightLavender,
         ),
 
-        const SizedBox(height: 10),
+        const SizedBox(height: 11),
 
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _postAction(
-              Icons.photo_library_outlined,
-              'Photo',
-              FolktriColors.primaryIndigo,
+            Expanded(
+              child: _quickPostAction(
+                icon:
+                    Icons.photo_library_outlined,
+                label: 'Photo',
+                color:
+                    FolktriColors.primaryIndigo,
+                onTap: () {
+                  _handleQuickPost(
+                    'photo',
+                  );
+                },
+              ),
             ),
-            _postAction(
-              Icons.videocam_outlined,
-              'Video',
-              FolktriColors.primaryIndigo,
+
+            Expanded(
+              child: _quickPostAction(
+                icon:
+                    Icons.videocam_outlined,
+                label: 'Video',
+                color:
+                    FolktriColors.primaryIndigo,
+                onTap: () {
+                  _handleQuickPost(
+                    'video',
+                  );
+                },
+              ),
             ),
-            _postAction(
-              Icons.event_outlined,
-              'Event',
-              FolktriColors.primaryIndigo,
+
+            Expanded(
+              child: _quickPostAction(
+                icon:
+                    Icons.event_outlined,
+                label: 'Event',
+                color:
+                    FolktriColors.connectionTeal,
+                onTap: () {
+                  _handleQuickPost(
+                    'event',
+                  );
+                },
+              ),
             ),
-            _postAction(
-              Icons.star_outline_rounded,
-              'Milestone',
-              FolktriColors.dustyRose,
+
+            Expanded(
+              child: _quickPostAction(
+                icon:
+                    Icons.star_outline_rounded,
+                label: 'Milestone',
+                color:
+                    FolktriColors.dustyRose,
+                onTap: () {
+                  _handleQuickPost(
+                    'milestone',
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -3945,31 +5399,131 @@ Widget buildQuickPostCard() {
   );
 }
 
-Widget _postAction(
-  IconData icon,
-  String label,
-  Color color,
-) {
+Widget _quickPostAction({
+  required IconData icon,
+  required String label,
+  required Color color,
+  required VoidCallback onTap,
+}) {
   return InkWell(
-    borderRadius: BorderRadius.circular(10),
-    onTap: _showPostOptions,
+    borderRadius: BorderRadius.circular(14),
+    onTap: onTap,
     child: Padding(
       padding: const EdgeInsets.symmetric(
-        horizontal: 3,
-        vertical: 4,
+        vertical: 8,
+        horizontal: 4,
       ),
-      child: Row(
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 17, color: color),
-          const SizedBox(width: 4),
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: color.withValues(
+                alpha: 0.10,
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 20,
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
           Text(
             label,
             style: const TextStyle(
+              color:
+                  FolktriColors.secondaryText,
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: FolktriColors.primaryText,
             ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildPostOptionTile({
+  required IconData icon,
+  required String title,
+  required String subtitle,
+  required Color color,
+  required VoidCallback onTap,
+}) {
+  return InkWell(
+    borderRadius: BorderRadius.circular(16),
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: FolktriColors.background,
+        borderRadius:
+            BorderRadius.circular(16),
+        border: Border.all(
+          color:
+              FolktriColors.lightLavender,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withValues(
+                alpha: 0.10,
+              ),
+              borderRadius:
+                  BorderRadius.circular(13),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+            ),
+          ),
+
+          const SizedBox(width: 13),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: FolktriColors
+                        .primaryText,
+                    fontSize: 14,
+                    fontWeight:
+                        FontWeight.w700,
+                  ),
+                ),
+
+                const SizedBox(height: 3),
+
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: FolktriColors
+                        .secondaryText,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const Icon(
+            Icons.chevron_right_rounded,
+            color:
+                FolktriColors.secondaryText,
           ),
         ],
       ),
@@ -3980,50 +5534,136 @@ Widget _postAction(
 void _showPostOptions() {
   final familyId = selectedFamilyId;
 
-  if (familyId == null) {
-    showFamilyOptions();
+  if (familyId == null ||
+      familyId.isEmpty) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Please select a family first.',
+        ),
+      ),
+    );
+
     return;
   }
 
   showModalBottomSheet<void>(
     context: context,
+    backgroundColor:
+        FolktriColors.surface,
     showDragHandle: true,
-    builder: (sheetContext) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          20, 8, 20, 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Share with your family',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: FolktriColors.primaryText,
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            ListTile(
-              leading: const Icon(
-                Icons.family_restroom_rounded,
-                color: FolktriColors.primaryIndigo,
-              ),
-              title: const Text('Open family page'),
-              subtitle: const Text(
-                'Share photos, milestones, and more.',
-              ),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                context.push('/family/$familyId');
-              },
-            ),
-          ],
-        ),
+    shape:
+        const RoundedRectangleBorder(
+      borderRadius:
+          BorderRadius.vertical(
+        top: Radius.circular(24),
       ),
     ),
+    builder: (sheetContext) {
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding:
+              const EdgeInsets.fromLTRB(
+            20,
+            4,
+            20,
+            24,
+          ),
+          child: Column(
+            mainAxisSize:
+                MainAxisSize.min,
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Create a post',
+                style: TextStyle(
+                  color: FolktriColors
+                      .midnightIndigo,
+                  fontSize: 21,
+                  fontWeight:
+                      FontWeight.w800,
+                ),
+              ),
+
+              const SizedBox(height: 5),
+
+              const Text(
+                'Share an update with your family.',
+                style: TextStyle(
+                  color: FolktriColors
+                      .secondaryText,
+                  fontSize: 13,
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              _buildPostOptionTile(
+                icon:
+                    Icons.photo_library_outlined,
+                title: 'Photo or video',
+                subtitle:
+                    'Share a family moment',
+                color:
+                    FolktriColors.primaryIndigo,
+                onTap: () {
+                  Navigator.pop(
+                    sheetContext,
+                  );
+
+                  //_showMediaChoice();
+                },
+              ),
+
+              const SizedBox(height: 8),
+
+              _buildPostOptionTile(
+                icon:
+                    Icons.event_outlined,
+                title: 'Event',
+                subtitle:
+                    'Add something to the family calendar',
+                color:
+                    FolktriColors.connectionTeal,
+                onTap: () {
+                  Navigator.pop(
+                    sheetContext,
+                  );
+
+                  _handleQuickPost(
+                    'event',
+                  );
+                },
+              ),
+
+              const SizedBox(height: 8),
+
+              _buildPostOptionTile(
+                icon:
+                    Icons.star_outline_rounded,
+                title: 'Milestone',
+                subtitle:
+                    'Celebrate an important family moment',
+                color:
+                    FolktriColors.dustyRose,
+                onTap: () {
+                  Navigator.pop(
+                    sheetContext,
+                  );
+
+                  _handleQuickPost(
+                    'milestone',
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    },
   );
 }
 
@@ -4458,87 +6098,29 @@ Widget _todayCard({
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(14, 14, 14, 28),
                   children: [
-    //                 Row(
-    //                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    //                   children: [
-    //                     Text('Upcoming',
-    //                     style:
-    //                       Theme.of(context).textTheme.titleLarge,
-    //                     ),
 
-    //     if (families.isNotEmpty)
-    //       TextButton(
-    //         onPressed: () {
-    //           final familyId = selectedFamilyId;
+                    buildFamilySelector(),
 
-    //           if (familyId == null) {
-    //             return;
-    //           }
+                    const SizedBox(height: 12),
 
-    //           context.push('/family/$familyId/calendar',);
-    //         },
-    //         child:
-    //             const Text('View Calendar',),
-    //       ),
-    //   ],
-    // ),
+                    buildQuickPostCard(),
 
-    // const SizedBox(height: 8,),
+                    const SizedBox(height: 18,),
 
-    // if (isLoadingEvents)
-    //   const Center(
-    //     child:
-    //         CircularProgressIndicator(),
-    //   )
-    // else if (upcomingEvents.isEmpty)
-    //   const Padding(
-    //     padding:
-    //         EdgeInsets.symmetric(vertical: 24,),
-    //     child: Text('No upcoming events.',),
-    //   )
-    // else
-    //   SizedBox(
-    //     height: 190,
-    //     child:
-    //         ListView.builder(
-    //       scrollDirection: Axis.horizontal,
-    //       itemCount: upcomingEvents.length,
-    //       itemBuilder:
-    //           (
-    //         context,
-    //         index,
-    //       ) {
-    //         final event = upcomingEvents[index];
+                    buildTodaySection(),
 
-    //         return buildUpcomingEventCard(
-    //           event,
-    //         );
-    //       },
-    //     ),
-    //   ),
+                    const SizedBox(height: 22,),
 
-    buildFamilySelector(),
+                    Text('Family Feed',
+                      style:
+                        TextStyle(
+                          color: FolktriColors.primaryText,
+                          fontSize: 19,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
 
-    const SizedBox(height: 12),
-
-    buildQuickPostCard(),
-
-    const SizedBox(height: 18,),
-
-    buildTodaySection(),
-
-    const SizedBox(height: 22,),
-
-    Text('Family Feed',
-      style:
-          TextStyle(
-            color: FolktriColors.primaryText,
-            fontSize: 19,
-            fontWeight: FontWeight.bold,
-          ),
-    ),
-
-    const SizedBox(height: 12,),
+                    const SizedBox(height: 12,),
 
     if (isLoadingFeed)
       const Padding(

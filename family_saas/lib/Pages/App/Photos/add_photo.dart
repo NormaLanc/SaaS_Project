@@ -4,173 +4,241 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../Styling/folktri_colors.dart';
 
 class AddPhotoPage extends StatefulWidget {
   final String familyId;
   final String? childId;
+  final String? mediaType;
 
   const AddPhotoPage({
     super.key,
     required this.familyId,
     this.childId,
+    this.mediaType = 'photo',
   });
 
+  bool get isVideo => mediaType == 'video';
+
   @override
-  State<AddPhotoPage> createState() =>
-      _AddPhotoPageState();
+  State<AddPhotoPage> createState() => _AddPhotoPageState();
 }
 
-class _AddPhotoPageState
-    extends State<AddPhotoPage> {
+class _AddPhotoPageState extends State<AddPhotoPage> {
 
-  final supabase =
-      Supabase.instance.client;
+  final supabase = Supabase.instance.client;
 
-  final ImagePicker imagePicker =
-      ImagePicker();
+  final ImagePicker imagePicker = ImagePicker();
 
-  final captionController =
-      TextEditingController();
+  final captionController = TextEditingController();
 
-  XFile? selectedImage;
-  Uint8List? selectedImageBytes;
+  XFile? selectedMedia;
+  Uint8List? selectedMediaBytes;
 
   bool isSaving = false;
 
-  Future<void> pickImage() async {
-    final image =
-        await imagePicker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-    );
+  Future<void> pickMedia() async {
+  try {
+    XFile? media;
 
-    if (image == null) return;
+    if (widget.isVideo) {
+      media =
+          await imagePicker.pickVideo(
+        source: ImageSource.gallery,
+      );
+    } else {
+      media =
+          await imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+    }
+
+    if (media == null) return;
 
     final bytes =
-        await image.readAsBytes();
+        await media.readAsBytes();
 
     if (!mounted) return;
 
     setState(() {
-      selectedImage = image;
-      selectedImageBytes = bytes;
+      selectedMedia = media;
+      selectedMediaBytes = bytes;
     });
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(
+          widget.isVideo
+              ? 'Unable to select video: $e'
+              : 'Unable to select photo: $e',
+        ),
+      ),
+    );
+  }
+}
+
+  Future<String> uploadMedia({
+  required String photoId,
+}) async {
+  final media = selectedMedia;
+  final bytes = selectedMediaBytes;
+
+  if (media == null ||
+      bytes == null) {
+    throw Exception(
+      'No media selected.',
+    );
   }
 
-  Future<String> uploadPhoto({required String photoId,}) async {
-    
-    final extension = selectedImage!.name.split('.').last;
+  final fileName =
+      media.name;
 
-    final filePath = '${widget.familyId}/$photoId/photo.$extension';
+  final extension =
+      fileName.contains('.')
+          ? fileName
+              .split('.')
+              .last
+              .toLowerCase()
+          : widget.isVideo
+              ? 'mp4'
+              : 'jpg';
 
-    await supabase.storage
-        .from('family_photos')
-        .uploadBinary(
-          filePath,
-          selectedImageBytes!,
+  final mediaFileName =
+      widget.isVideo
+          ? 'video.$extension'
+          : 'photo.$extension';
+
+  final filePath =
+      '${widget.familyId}/'
+      '$photoId/'
+      '$mediaFileName';
+
+  await supabase.storage
+      .from('family_photos')
+      .uploadBinary(
+        filePath,
+        bytes,
+      );
+
+  return supabase.storage
+      .from('family_photos')
+      .getPublicUrl(
+        filePath,
+      );
+}
+
+  Future<void> saveMedia() async {
+  final user =
+      supabase.auth.currentUser;
+
+  if (user == null) return;
+
+  if (selectedMedia == null ||
+      selectedMediaBytes == null) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(
+          widget.isVideo
+              ? 'Please select a video.'
+              : 'Please select a photo.',
+        ),
+      ),
+    );
+
+    return;
+  }
+
+  try {
+    setState(() {
+      isSaving = true;
+    });
+
+    final createdPhoto =
+        await supabase
+            .from('Photos')
+            .insert({
+              'family_id':
+                  widget.familyId,
+
+              'child_id':
+                  widget.childId,
+
+              'photo_url':
+                  '',
+
+              'caption':
+                  captionController
+                          .text
+                          .trim()
+                          .isEmpty
+                      ? null
+                      : captionController
+                          .text
+                          .trim(),
+
+              'created_by':
+                  user.id,
+
+              // Your Photos table already
+              // contains this column.
+              'media_type':
+                  widget.isVideo
+                      ? 'video'
+                      : 'photo',
+            })
+            .select()
+            .single();
+
+    final photoId =
+        createdPhoto['id']
+            .toString();
+
+    final mediaUrl =
+        await uploadMedia(
+      photoId: photoId,
+    );
+
+    await supabase
+        .from('Photos')
+        .update({
+          // Keep using the existing column.
+          // For videos it will contain the
+          // video's URL.
+          'photo_url':
+              mediaUrl,
+        })
+        .eq(
+          'id',
+          photoId,
         );
 
-    return supabase.storage
-        .from('family_photos')
-        .getPublicUrl(filePath);
-  }
+    if (!mounted) return;
 
-  Future<void> savePhoto() async {
-    final user =
-        supabase.auth.currentUser;
+    context.pop(true);
+  } catch (e) {
+    if (!mounted) return;
 
-    if (user == null) return;
+    setState(() {
+      isSaving = false;
+    });
 
-    if (selectedImage == null ||
-        selectedImageBytes == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Please select a photo.',
-          ),
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(
+          widget.isVideo
+              ? 'Unable to post video: $e'
+              : 'Unable to post photo: $e',
         ),
-      );
-
-      return;
-    }
-
-    try {
-      setState(() {
-        isSaving = true;
-      });
-
-      // Create the database row first.
-      final createdPhoto =
-          await supabase
-              .from('Photos')
-              .insert({
-                'family_id':
-                    widget.familyId,
-
-                'child_id':
-                    widget.childId,
-
-                'photo_url': '',
-
-                'caption':
-                    captionController
-                            .text
-                            .trim()
-                            .isEmpty
-                        ? null
-                        : captionController
-                            .text
-                            .trim(),
-
-                'created_by':
-                    user.id,
-              })
-              .select()
-              .single();
-
-      final photoId =
-          createdPhoto['id']
-              .toString();
-
-      // Upload the actual image.
-      final photoUrl =
-          await uploadPhoto(
-        photoId: photoId,
-      );
-
-      // Save its URL.
-      await supabase
-          .from('Photos')
-          .update({
-            'photo_url':
-                photoUrl,
-          })
-          .eq(
-            'id',
-            photoId,
-          );
-
-      if (!mounted) return;
-
-      context.pop(true);
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        isSaving = false;
-      });
-
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to post photo: $e',
-          ),
-        ),
-      );
-    }
+      ),
+    );
   }
+}
 
   @override
   void dispose() {
@@ -223,9 +291,10 @@ class _AddPhotoPageState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title:
-            const Text(
-          'Add Photo',
+        title: Text(
+              widget.isVideo
+                ? 'Add Video'
+                : 'Add Photo',
         ),
       ),
       body:
@@ -236,46 +305,97 @@ class _AddPhotoPageState
           crossAxisAlignment:
               CrossAxisAlignment.start,
           children: [
-            if (selectedImageBytes !=
-                null)
-              ClipRRect(
-                borderRadius:
-                    BorderRadius.circular(
-                  12,
+            if (selectedMediaBytes != null)
+               widget.isVideo
+      ? Container(
+          width: double.infinity,
+          height: 250,
+          decoration: BoxDecoration(
+            color:
+                FolktriColors.midnightIndigo,
+            borderRadius:
+                BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisAlignment:
+                MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.play_circle_fill_rounded,
+                size: 72,
+                color: Colors.white,
+              ),
+
+              const SizedBox(height: 12),
+
+              const Text(
+                'Video selected',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight:
+                      FontWeight.w700,
                 ),
-                child: Image.memory(
-                  selectedImageBytes!,
-                  width:
-                      double.infinity,
-                  height: 300,
-                  fit:
-                      BoxFit.cover,
+              ),
+
+              const SizedBox(height: 6),
+
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(
+                  horizontal: 20,
                 ),
-              )
-            else
-              Container(
-                width:
-                    double.infinity,
-                height: 250,
-                decoration:
-                    BoxDecoration(
-                  border:
-                      Border.all(),
-                  borderRadius:
-                      BorderRadius
-                          .circular(
-                    12,
-                  ),
-                ),
-                child:
-                    const Center(
-                  child: Icon(
-                    Icons
-                        .add_photo_alternate,
-                    size: 60,
+                child: Text(
+                  selectedMedia?.name ??
+                      'Video',
+                  maxLines: 1,
+                  overflow:
+                      TextOverflow.ellipsis,
+                  textAlign:
+                      TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
                   ),
                 ),
               ),
+            ],
+          ),
+        )
+      : ClipRRect(
+          borderRadius:
+              BorderRadius.circular(12),
+          child: Image.memory(
+            selectedMediaBytes!,
+            width: double.infinity,
+            height: 300,
+            fit: BoxFit.cover,
+          ),
+        )
+else
+  Container(
+    width: double.infinity,
+    height: 250,
+    decoration: BoxDecoration(
+      color: FolktriColors.background,
+      border: Border.all(
+        color:
+            FolktriColors.lightLavender,
+      ),
+      borderRadius:
+          BorderRadius.circular(12),
+    ),
+    child: Center(
+      child: Icon(
+        widget.isVideo
+            ? Icons.video_library_outlined
+            : Icons.add_photo_alternate_outlined,
+        size: 60,
+        color:
+            FolktriColors.primaryIndigo,
+      ),
+    ),
+  ),
 
             const SizedBox(
               height: 16,
@@ -286,18 +406,25 @@ class _AddPhotoPageState
                   double.infinity,
               child:
                   OutlinedButton.icon(
-                onPressed:
-                    pickImage,
-                icon:
-                    const Icon(
-                  Icons.photo_library,
-                ),
-                label: Text(
-                  selectedImage == null
-                      ? 'Choose Photo'
-                      : 'Change Photo',
-                ),
-              ),
+                    onPressed:
+                      isSaving
+                        ? null
+                        : pickMedia,
+                    icon: Icon(
+                      widget.isVideo
+                        ? Icons.video_library_outlined
+                        : Icons.photo_library_outlined,
+                    ),
+                    label: Text(
+                      selectedMedia == null
+                        ? widget.isVideo
+                          ? 'Choose Video'
+                          : 'Choose Photo'
+                        : widget.isVideo
+                          ? 'Change Video'
+                          : 'Change Photo',
+  ),
+),
             ),
 
             const SizedBox(
@@ -329,11 +456,13 @@ class _AddPhotoPageState
                 onPressed:
                     isSaving
                         ? null
-                        : savePhoto,
+                        : saveMedia,
                 child: isSaving
                     ? const CircularProgressIndicator()
-                    : const Text(
-                        'Post Photo',
+                    :  Text(
+                      widget.isVideo
+                        ? 'Post Video'
+                        :  'Post Photo',
                       ),
               ),
             ),
