@@ -28,6 +28,8 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
 
   bool isUpdatingLike = false;
 
+  Map<String, int> photoCommentCounts = {};
+
   List<Map<String, dynamic>> upcomingEvents = [];
   bool isLoadingEvents = true;
 
@@ -447,6 +449,7 @@ Future<void> loadFeed() async {
     });
 
     await loadPhotoLikes();
+    await loadPhotoCommentCounts();
   } catch (e) {
     debugPrint(
       'Unable to load dashboard feed: $e',
@@ -540,6 +543,71 @@ Future<void> loadPhotoLikes() async {
   }
 }
 
+Future<void> loadPhotoCommentCounts() async {
+  try {
+    final photoIds = feedItems
+        .where(
+          (item) => item['type'] == 'photo',
+        )
+        .map(
+          (item) => item['id']?.toString(),
+        )
+        .whereType<String>()
+        .where(
+          (id) => id.isNotEmpty,
+        )
+        .toList();
+
+    if (photoIds.isEmpty) {
+      if (!mounted) return;
+
+      setState(() {
+        photoCommentCounts = {};
+      });
+
+      return;
+    }
+
+    final response = await supabase
+        .from('Photo_Comments')
+        .select('photo_id')
+        .inFilter(
+          'photo_id',
+          photoIds,
+        );
+
+    final comments =
+        List<Map<String, dynamic>>.from(
+      response,
+    );
+
+    final counts = <String, int>{};
+
+    for (final comment in comments) {
+      final photoId =
+          comment['photo_id']?.toString();
+
+      if (photoId == null ||
+          photoId.isEmpty) {
+        continue;
+      }
+
+      counts[photoId] =
+          (counts[photoId] ?? 0) + 1;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      photoCommentCounts = counts;
+    });
+  } catch (e) {
+    debugPrint(
+      'Unable to load photo comment counts: $e',
+    );
+  }
+}
+
 Future<void> togglePhotoLike(
   String photoId,
 ) async {
@@ -604,6 +672,831 @@ Future<void> togglePhotoLike(
   }
 }
 
+Future<void> showPhotoComments(
+  String photoId,
+) async {
+  final currentUser =
+      supabase.auth.currentUser;
+
+  if (currentUser == null) return;
+
+  final commentController =
+      TextEditingController();
+
+  List<Map<String, dynamic>> comments = [];
+
+  bool isLoadingComments = true;
+  bool isPostingComment = false;
+
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor:
+        FolktriColors.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(24),
+      ),
+    ),
+    builder: (sheetContext) {
+      return StatefulBuilder(
+        builder: (
+          context,
+          setSheetState,
+        ) {
+          Future<void> loadComments() async {
+            try {
+              final response =
+                  await supabase
+                      .from(
+                        'Photo_Comments',
+                      )
+                      .select(
+                        '''
+                        id,
+                        photo_id,
+                        user_id,
+                        comment_text,
+                        created_at
+                        ''',
+                      )
+                      .eq(
+                        'photo_id',
+                        photoId,
+                      )
+                      .order(
+                        'created_at',
+                        ascending: true,
+                      );
+
+              final loadedComments =
+                  List<Map<String, dynamic>>
+                      .from(
+                response,
+              );
+
+              final userIds =
+                  loadedComments
+                      .map(
+                        (comment) =>
+                            comment[
+                                    'user_id']
+                                ?.toString(),
+                      )
+                      .whereType<String>()
+                      .where(
+                        (id) =>
+                            id.isNotEmpty,
+                      )
+                      .toSet()
+                      .toList();
+
+              final profilesByUserId =
+                  <String,
+                      Map<String,
+                          dynamic>>{};
+
+              if (userIds.isNotEmpty) {
+                final profileResponse =
+                    await supabase
+                        .from(
+                          'Profiles',
+                        )
+                        .select(
+                          '''
+                          user_id,
+                          first_name,
+                          last_name,
+                          profile_photo_path
+                          ''',
+                        )
+                        .inFilter(
+                          'user_id',
+                          userIds,
+                        );
+
+                final profiles = List<
+                    Map<String,
+                        dynamic>>.from(
+                  profileResponse,
+                );
+
+                for (final profile
+                    in profiles) {
+                  final userId =
+                      profile['user_id']
+                          ?.toString();
+
+                  if (userId != null) {
+                    profilesByUserId[
+                            userId] =
+                        profile;
+                  }
+                }
+              }
+
+              for (final comment
+                  in loadedComments) {
+                final userId =
+                    comment['user_id']
+                        ?.toString();
+
+                comment['profile'] =
+                    userId == null
+                        ? null
+                        : profilesByUserId[
+                            userId];
+              }
+
+              if (!sheetContext.mounted) {
+                return;
+              }
+
+              setSheetState(() {
+                comments =
+                    loadedComments;
+
+                isLoadingComments =
+                    false;
+              });
+            } catch (e) {
+              debugPrint(
+                'Unable to load comments: $e',
+              );
+
+              if (!sheetContext.mounted) {
+                return;
+              }
+
+              setSheetState(() {
+                isLoadingComments =
+                    false;
+              });
+            }
+          }
+
+          Future<void> postComment()
+              async {
+            final commentText =
+                commentController.text
+                    .trim();
+
+            if (commentText.isEmpty ||
+                isPostingComment) {
+              return;
+            }
+
+            try {
+              setSheetState(() {
+                isPostingComment = true;
+              });
+
+              await supabase
+                  .from(
+                    'Photo_Comments',
+                  )
+                  .insert({
+                'photo_id': photoId,
+                'user_id':
+                    currentUser.id,
+                'comment_text':
+                    commentText,
+              });
+
+              commentController.clear();
+
+              await loadComments();
+              await loadPhotoCommentCounts();
+            } catch (e) {
+              debugPrint(
+                'Unable to post comment: $e',
+              );
+
+              if (!sheetContext.mounted) {
+                return;
+              }
+
+              ScaffoldMessenger.of(
+                sheetContext,
+              ).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Unable to post comment: $e',
+                  ),
+                ),
+              );
+            } finally {
+              if (sheetContext.mounted) {
+                setSheetState(() {
+                  isPostingComment =
+                      false;
+                });
+              }
+            }
+          }
+
+          Future<void> deleteComment(
+            String commentId,
+          ) async {
+            try {
+              await supabase
+                  .from(
+                    'Photo_Comments',
+                  )
+                  .delete()
+                  .eq(
+                    'id',
+                    commentId,
+                  )
+                  .eq(
+                    'user_id',
+                    currentUser.id,
+                  );
+
+              await loadComments();
+              await loadPhotoCommentCounts();
+            } catch (e) {
+              debugPrint(
+                'Unable to delete comment: $e',
+              );
+            }
+          }
+
+          if (isLoadingComments) {
+            loadComments();
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom:
+                  MediaQuery.of(context)
+                      .viewInsets
+                      .bottom,
+            ),
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height:
+                    MediaQuery.of(context)
+                            .size
+                            .height *
+                        0.72,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding:
+                          const EdgeInsets
+                              .fromLTRB(
+                        20,
+                        16,
+                        12,
+                        12,
+                      ),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Comments',
+                              textAlign:
+                                  TextAlign
+                                      .center,
+                              style:
+                                  TextStyle(
+                                color:
+                                    FolktriColors
+                                        .primaryText,
+                                fontSize:
+                                    18,
+                                fontWeight:
+                                    FontWeight
+                                        .bold,
+                              ),
+                            ),
+                          ),
+
+                          IconButton(
+                            onPressed: () {
+                              Navigator.pop(
+                                sheetContext,
+                              );
+                            },
+                            icon: const Icon(
+                              Icons
+                                  .close_rounded,
+                              color:
+                                  FolktriColors
+                                      .secondaryText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const Divider(
+                      height: 1,
+                      color:
+                          FolktriColors
+                              .lightLavender,
+                    ),
+
+                    Expanded(
+                      child:
+                          isLoadingComments
+                              ? const Center(
+                                  child:
+                                      CircularProgressIndicator(),
+                                )
+                              : comments
+                                      .isEmpty
+                                  ? const Center(
+                                      child:
+                                          Padding(
+                                        padding:
+                                            EdgeInsets
+                                                .all(
+                                          30,
+                                        ),
+                                        child:
+                                            Column(
+                                          mainAxisSize:
+                                              MainAxisSize
+                                                  .min,
+                                          children: [
+                                            Icon(
+                                              Icons
+                                                  .chat_bubble_outline_rounded,
+                                              size:
+                                                  38,
+                                              color:
+                                                  FolktriColors
+                                                      .primaryIndigo,
+                                            ),
+                                            SizedBox(
+                                              height:
+                                                  10,
+                                            ),
+                                            Text(
+                                              'No comments yet',
+                                              style:
+                                                  TextStyle(
+                                                color:
+                                                    FolktriColors
+                                                        .primaryText,
+                                                fontWeight:
+                                                    FontWeight
+                                                        .bold,
+                                              ),
+                                            ),
+                                            SizedBox(
+                                              height:
+                                                  4,
+                                            ),
+                                            Text(
+                                              'Be the first to leave a family comment.',
+                                              textAlign:
+                                                  TextAlign
+                                                      .center,
+                                              style:
+                                                  TextStyle(
+                                                color:
+                                                    FolktriColors
+                                                        .secondaryText,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    )
+                                  : ListView
+                                      .builder(
+                                      padding:
+                                          const EdgeInsets
+                                              .symmetric(
+                                        vertical:
+                                            10,
+                                      ),
+                                      itemCount:
+                                          comments
+                                              .length,
+                                      itemBuilder:
+                                          (
+                                        context,
+                                        index,
+                                      ) {
+                                        final comment =
+                                            comments[
+                                                index];
+
+                                        return buildPhotoCommentTile(
+                                          comment:
+                                              comment,
+                                          currentUserId:
+                                              currentUser
+                                                  .id,
+                                          onDelete:
+                                              deleteComment,
+                                        );
+                                      },
+                                    ),
+                    ),
+
+                    const Divider(
+                      height: 1,
+                      color:
+                          FolktriColors
+                              .lightLavender,
+                    ),
+
+                    Padding(
+                      padding:
+                          const EdgeInsets
+                              .fromLTRB(
+                        14,
+                        10,
+                        14,
+                        12,
+                      ),
+                      child: Row(
+                        crossAxisAlignment:
+                            CrossAxisAlignment
+                                .end,
+                        children: [
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor:
+                                FolktriColors
+                                    .lightLavender,
+                            backgroundImage:
+                                profilePhotoUrl !=
+                                        null
+                                    ? NetworkImage(
+                                        profilePhotoUrl!,
+                                      )
+                                    : null,
+                            child:
+                                profilePhotoUrl ==
+                                        null
+                                    ? const Icon(
+                                        Icons
+                                            .person_rounded,
+                                        color:
+                                            FolktriColors
+                                                .primaryIndigo,
+                                        size:
+                                            19,
+                                      )
+                                    : null,
+                          ),
+
+                          const SizedBox(
+                            width: 9,
+                          ),
+
+                          Expanded(
+                            child:
+                                TextField(
+                              controller:
+                                  commentController,
+                              minLines: 1,
+                              maxLines: 4,
+                              maxLength:
+                                  1000,
+                              textCapitalization:
+                                  TextCapitalization
+                                      .sentences,
+                              decoration:
+                                  InputDecoration(
+                                hintText:
+                                    'Add a comment...',
+                                counterText:
+                                    '',
+                                filled:
+                                    true,
+                                fillColor:
+                                    FolktriColors
+                                        .background,
+                                contentPadding:
+                                    const EdgeInsets
+                                        .symmetric(
+                                  horizontal:
+                                      14,
+                                  vertical:
+                                      11,
+                                ),
+                                border:
+                                    OutlineInputBorder(
+                                  borderRadius:
+                                      BorderRadius
+                                          .circular(
+                                    22,
+                                  ),
+                                  borderSide:
+                                      BorderSide
+                                          .none,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(
+                            width: 5,
+                          ),
+
+                          IconButton(
+                            tooltip:
+                                'Post comment',
+                            onPressed:
+                                isPostingComment
+                                    ? null
+                                    : postComment,
+                            icon:
+                                isPostingComment
+                                    ? const SizedBox(
+                                        width:
+                                            20,
+                                        height:
+                                            20,
+                                        child:
+                                            CircularProgressIndicator(
+                                          strokeWidth:
+                                              2,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons
+                                            .send_rounded,
+                                        color:
+                                            FolktriColors
+                                                .primaryIndigo,
+                                      ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+
+  commentController.dispose();
+
+  await loadPhotoCommentCounts();
+}
+
+Widget buildPhotoCommentTile({
+  required Map<String, dynamic>
+      comment,
+  required String currentUserId,
+  required Future<void> Function(
+    String commentId,
+  ) onDelete,
+}) {
+  final profile =
+      comment['profile'];
+
+  final firstName =
+      profile is Map
+          ? profile['first_name']
+                  ?.toString()
+                  .trim() ??
+              ''
+          : '';
+
+  final lastName =
+      profile is Map
+          ? profile['last_name']
+                  ?.toString()
+                  .trim() ??
+              ''
+          : '';
+
+  final fullName = [
+    firstName,
+    lastName,
+  ].where(
+    (name) => name.isNotEmpty,
+  ).join(' ');
+
+  final displayName =
+      fullName.isEmpty
+          ? 'Family member'
+          : fullName;
+
+  final commentText =
+      comment['comment_text']
+              ?.toString() ??
+          '';
+
+  final commentUserId =
+      comment['user_id']
+              ?.toString() ??
+          '';
+
+  final isOwnComment =
+      commentUserId ==
+          currentUserId;
+
+  final createdAt =
+      DateTime.tryParse(
+    comment['created_at']
+            ?.toString() ??
+        '',
+  )?.toLocal();
+
+  String timeLabel = '';
+
+  if (createdAt != null) {
+    final difference =
+        DateTime.now()
+            .difference(createdAt);
+
+    if (difference.inMinutes < 1) {
+      timeLabel = 'Just now';
+    } else if (
+        difference.inMinutes < 60) {
+      timeLabel =
+          '${difference.inMinutes}m';
+    } else if (
+        difference.inHours < 24) {
+      timeLabel =
+          '${difference.inHours}h';
+    } else if (
+        difference.inDays < 7) {
+      timeLabel =
+          '${difference.inDays}d';
+    } else {
+      timeLabel =
+          '${createdAt.month}/'
+          '${createdAt.day}/'
+          '${createdAt.year}';
+    }
+  }
+
+  return Padding(
+    padding:
+        const EdgeInsets.symmetric(
+      horizontal: 16,
+      vertical: 8,
+    ),
+    child: Row(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: 18,
+          backgroundColor:
+              FolktriColors
+                  .lightLavender,
+          child: Text(
+            firstName.isNotEmpty
+                ? firstName[0]
+                    .toUpperCase()
+                : '?',
+            style: const TextStyle(
+              color:
+                  FolktriColors
+                      .primaryIndigo,
+              fontWeight:
+                  FontWeight.bold,
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 10),
+
+        Expanded(
+          child: Container(
+            padding:
+                const EdgeInsets
+                    .fromLTRB(
+              12,
+              9,
+              12,
+              9,
+            ),
+            decoration:
+                BoxDecoration(
+              color:
+                  FolktriColors
+                      .background,
+              borderRadius:
+                  BorderRadius.circular(
+                14,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment
+                      .start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        displayName,
+                        style:
+                            const TextStyle(
+                          color:
+                              FolktriColors
+                                  .primaryText,
+                          fontSize:
+                              12,
+                          fontWeight:
+                              FontWeight
+                                  .bold,
+                        ),
+                      ),
+                    ),
+
+                    if (timeLabel
+                        .isNotEmpty)
+                      Text(
+                        timeLabel,
+                        style:
+                            const TextStyle(
+                          color:
+                              FolktriColors
+                                  .secondaryText,
+                          fontSize:
+                              10,
+                        ),
+                      ),
+                  ],
+                ),
+
+                const SizedBox(
+                  height: 4,
+                ),
+
+                Text(
+                  commentText,
+                  style:
+                      const TextStyle(
+                    color:
+                        FolktriColors
+                            .primaryText,
+                    fontSize: 13,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        if (isOwnComment)
+          PopupMenuButton<String>(
+            padding:
+                EdgeInsets.zero,
+            icon: const Icon(
+              Icons.more_vert_rounded,
+              size: 19,
+              color:
+                  FolktriColors
+                      .secondaryText,
+            ),
+            onSelected:
+                (value) async {
+              if (value ==
+                  'delete') {
+                await onDelete(
+                  comment['id']
+                      .toString(),
+                );
+              }
+            },
+            itemBuilder:
+                (context) => const [
+              PopupMenuItem<String>(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons
+                          .delete_outline_rounded,
+                      size: 19,
+                    ),
+                    SizedBox(
+                      width: 8,
+                    ),
+                    Text(
+                      'Delete comment',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+      ],
+    ),
+  );
+}
+
 Widget buildFeedItem(
   Map<String, dynamic> item,
 ) {
@@ -625,11 +1518,8 @@ Widget buildFeedItem(
   return const SizedBox.shrink();
 }
 
-Widget buildPhotoFeedCard(
-  Map<String, dynamic> photo,
-) {
-  final childData =
-      photo['child'];
+Widget buildPhotoFeedCard( Map<String, dynamic> photo) {
+  final childData = photo['child'];
 
 String childName = '';
 
@@ -661,6 +1551,9 @@ String childName = '';
 
   final isLiked =
     likedPhotoIds.contains(photoId);
+
+  final commentCount =
+    photoCommentCounts[photoId] ?? 0;
 
   final createdAt = DateTime.tryParse(
     photo['created_at']?.toString() ?? '',
@@ -804,8 +1697,7 @@ String childName = '';
                 );
               },
         child: Padding(
-          padding:
-              const EdgeInsets.symmetric(
+          padding: const EdgeInsets.symmetric(
             horizontal: 6,
             vertical: 6,
           ),
@@ -822,9 +1714,7 @@ String childName = '';
                         .secondaryText,
               ),
 
-              const SizedBox(
-                width: 6,
-              ),
+              const SizedBox(width: 6,),
 
               Text(
                 likeCount == 1
@@ -837,8 +1727,7 @@ String childName = '';
                       : FolktriColors
                           .secondaryText,
                   fontSize: 13,
-                  fontWeight:
-                      FontWeight.w600,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -846,19 +1735,15 @@ String childName = '';
         ),
       ),
 
-      const SizedBox(
-        width: 18,
-      ),
+      const SizedBox(width: 18,),
 
       InkWell(
-        borderRadius:
-            BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20),
         onTap: () {
-          // Comments will be connected next.
+          showPhotoComments(photoId);
         },
-        child: const Padding(
-          padding:
-              EdgeInsets.symmetric(
+        child: Padding(
+          padding: EdgeInsets.symmetric(
             horizontal: 6,
             vertical: 6,
           ),
@@ -867,22 +1752,21 @@ String childName = '';
               Icon(
                 Icons.chat_bubble_outline_rounded,
                 size: 21,
-                color: FolktriColors
-                    .secondaryText,
+                color: FolktriColors.secondaryText,
               ),
 
-              SizedBox(
-                width: 6,
-              ),
+              SizedBox(width: 6),
 
               Text(
-                'Comment',
-                style: TextStyle(
-                  color: FolktriColors
-                      .secondaryText,
+                commentCount == 0
+                  ? 'Comment'
+                : commentCount == 1
+                  ? '1 comment'
+                  : '$commentCount comments',
+                style: const TextStyle(
+                  color: FolktriColors.secondaryText,
                   fontSize: 13,
-                  fontWeight:
-                      FontWeight.w600,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -895,8 +1779,7 @@ String childName = '';
       const Icon(
         Icons.lock_outline_rounded,
         size: 15,
-        color:
-            FolktriColors.secondaryText,
+        color: FolktriColors.secondaryText,
       ),
     ],
   ),
@@ -904,110 +1787,10 @@ String childName = '';
       ],
     ),
   );
-  // String? childName;
-
-  // if (childData != null) {
-  //   final firstName =
-  //       childData['first_name'] ?? '';
-
-  //   final middleName =
-  //       childData['middle_name'] ?? '';
-
-  //   final lastName =
-  //       childData['last_name'] ?? '';
-
-  //   final name = [
-  //     firstName,
-  //     middleName,
-  //     lastName,
-  //   ]
-  //       .where(
-  //         (value) =>
-  //             value
-  //                 .toString()
-  //                 .trim()
-  //                 .isNotEmpty,
-  //       )
-  //       .join(' ');
-
-  //   if (name.isNotEmpty) {
-  //     childName = name;
-  //   }
-  // }
-
-  // return Card(
-  //   margin:
-  //       const EdgeInsets.only(
-  //     bottom: 16,
-  //   ),
-  //   child: Column(
-  //     crossAxisAlignment:
-  //         CrossAxisAlignment.start,
-  //     children: [
-  //       Padding(
-  //         padding:
-  //             const EdgeInsets.all(
-  //           16,
-  //         ),
-  //         child: Row(
-  //           children: [
-  //             const CircleAvatar(
-  //               child: Icon(
-  //                 Icons.photo,
-  //               ),
-  //             ),
-
-  //             const SizedBox(
-  //               width: 12,
-  //             ),
-
-  //             Expanded(
-  //               child: Text(
-  //                 childName != null
-  //                     ? 'New photo of $childName'
-  //                     : 'New family photo',
-  //                 style:
-  //                     const TextStyle(
-  //                   fontWeight:
-  //                       FontWeight.bold,
-  //                 ),
-  //               ),
-  //             ),
-  //           ],
-  //         ),
-  //       ),
-
-  //       if (photo['photo_url'] !=
-  //           null)
-  //         Image.network(
-  //           photo['photo_url'],
-  //           width:
-  //               double.infinity,
-  //           height: 300,
-  //           fit:
-  //               BoxFit.cover,
-  //         ),
-
-  //       if (photo['caption'] !=
-  //           null)
-  //         Padding(
-  //           padding:
-  //               const EdgeInsets
-  //                   .all(16),
-  //           child: Text(
-  //             photo['caption'],
-  //           ),
-  //         ),
-  //     ],
-  //   ),
-  // );
 }
 
-Widget buildMilestoneFeedCard(
-  Map<String, dynamic> milestone,
-) {
-  final childData =
-      milestone['child'];
+Widget buildMilestoneFeedCard(Map<String, dynamic> milestone,) {
+  final childData = milestone['child'];
 
   String childName = 'A child';
 
@@ -1030,21 +1813,15 @@ Widget buildMilestoneFeedCard(
     }
   }
 
-  final title =
-      milestone['title']?.toString().trim() ?? '';
+  final title = milestone['title']?.toString().trim() ?? '';
 
-  final description =
-      milestone['description']?.toString().trim() ?? '';
+  final description = milestone['description']?.toString().trim() ?? '';
 
-  final photoUrl =
-      milestone['photo_url']?.toString().trim() ?? '';
+  final photoUrl = milestone['photo_url']?.toString().trim() ?? '';
 
-  final childId =
-      milestone['child_id']?.toString();
+  final childId = milestone['child_id']?.toString();
 
-  final milestoneDate = DateTime.tryParse(
-    milestone['event_date']?.toString() ?? '',
-  );
+  final milestoneDate = DateTime.tryParse( milestone['event_date']?.toString() ?? '',);
 
   final createdAt = DateTime.tryParse(
     milestone['created_at']?.toString() ?? '',
@@ -1089,19 +1866,14 @@ Widget buildMilestoneFeedCard(
   // ==========================================
 
   return Container(
-    margin: const EdgeInsets.only(
-      bottom: 16,
-    ),
+    margin: const EdgeInsets.only(bottom: 16,),
 
     decoration: BoxDecoration(
       color: FolktriColors.surface,
-
       borderRadius: BorderRadius.circular(18),
-
       boxShadow: [
         BoxShadow(
-          color: FolktriColors.midnightIndigo
-              .withValues(alpha: 0.05),
+          color: FolktriColors.midnightIndigo.withValues(alpha: 0.05),
           blurRadius: 14,
           offset: const Offset(0, 4),
         ),
@@ -1110,9 +1882,7 @@ Widget buildMilestoneFeedCard(
 
     child: Material(
       color: Colors.transparent,
-
       borderRadius: BorderRadius.circular(18),
-
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
 
@@ -1125,8 +1895,7 @@ Widget buildMilestoneFeedCard(
               },
 
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
 
           children: [
             // ==================================
@@ -1134,23 +1903,17 @@ Widget buildMilestoneFeedCard(
             // ==================================
 
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                14, 14, 14, 12,
-              ),
-
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 12,),
               child: Row(
                 children: [
                   // Milestone avatar
                   const CircleAvatar(
                     radius: 21,
-
-                    backgroundColor:
-                        FolktriColors.lightLavender,
+                    backgroundColor: FolktriColors.lightLavender,
 
                     child: Icon(
                       Icons.auto_awesome_rounded,
-                      color:
-                          FolktriColors.primaryIndigo,
+                      color: FolktriColors.primaryIndigo,
                       size: 21,
                     ),
                   ),
@@ -1159,19 +1922,16 @@ Widget buildMilestoneFeedCard(
 
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
 
                       children: [
                         Text(
                           '$childName reached a milestone',
                           maxLines: 2,
-                          overflow:
-                              TextOverflow.ellipsis,
+                          overflow: TextOverflow.ellipsis,
 
                           style: const TextStyle(
-                            color:
-                                FolktriColors.primaryText,
+                            color: FolktriColors.primaryText,
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1185,12 +1945,10 @@ Widget buildMilestoneFeedCard(
                               child: Text(
                                 sharedLabel,
                                 maxLines: 1,
-                                overflow:
-                                    TextOverflow.ellipsis,
+                                overflow: TextOverflow.ellipsis,
 
                                 style: const TextStyle(
-                                  color:
-                                      FolktriColors.secondaryText,
+                                  color: FolktriColors.secondaryText,
                                   fontSize: 11,
                                 ),
                               ),
@@ -1201,8 +1959,7 @@ Widget buildMilestoneFeedCard(
                             const Text(
                               '·',
                               style: TextStyle(
-                                color:
-                                    FolktriColors.secondaryText,
+                                color: FolktriColors.secondaryText,
                               ),
                             ),
 
@@ -1210,8 +1967,7 @@ Widget buildMilestoneFeedCard(
 
                             const Icon(
                               Icons.lock_outline_rounded,
-                              color:
-                                  FolktriColors.secondaryText,
+                              color: FolktriColors.secondaryText,
                               size: 12,
                             ),
 
@@ -1220,8 +1976,7 @@ Widget buildMilestoneFeedCard(
                             const Text(
                               'Family only',
                               style: TextStyle(
-                                color:
-                                    FolktriColors.secondaryText,
+                                color: FolktriColors.secondaryText,
                                 fontSize: 11,
                               ),
                             ),
@@ -1246,13 +2001,10 @@ Widget buildMilestoneFeedCard(
             // ==================================
 
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                14, 0, 14, 12,
-              ),
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 12,),
 
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
 
                 children: [
                   if (title.isNotEmpty)
@@ -1260,8 +2012,7 @@ Widget buildMilestoneFeedCard(
                       title,
 
                       style: const TextStyle(
-                        color:
-                            FolktriColors.primaryText,
+                        color: FolktriColors.primaryText,
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
                         height: 1.3,
@@ -1275,8 +2026,7 @@ Widget buildMilestoneFeedCard(
                       description,
 
                       style: const TextStyle(
-                        color:
-                            FolktriColors.primaryText,
+                        color: FolktriColors.primaryText,
                         fontSize: 14,
                         height: 1.45,
                       ),
@@ -1287,18 +2037,15 @@ Widget buildMilestoneFeedCard(
 
                   // Date of the milestone
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(
+                    padding: const EdgeInsets.symmetric(
                       horizontal: 10,
                       vertical: 6,
                     ),
 
                     decoration: BoxDecoration(
-                      color: FolktriColors.lightLavender
-                          .withValues(alpha: 0.55),
+                      color: FolktriColors.lightLavender.withValues(alpha: 0.55),
 
-                      borderRadius:
-                          BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(20),
                     ),
 
                     child: Row(
@@ -1308,8 +2055,7 @@ Widget buildMilestoneFeedCard(
                         const Icon(
                           Icons.event_available_outlined,
                           size: 14,
-                          color:
-                              FolktriColors.primaryIndigo,
+                          color: FolktriColors.primaryIndigo,
                         ),
 
                         const SizedBox(width: 5),
@@ -1318,8 +2064,7 @@ Widget buildMilestoneFeedCard(
                           'Milestone date: $dateLabel',
 
                           style: const TextStyle(
-                            color:
-                                FolktriColors.midnightIndigo,
+                            color: FolktriColors.midnightIndigo,
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
@@ -1352,20 +2097,17 @@ Widget buildMilestoneFeedCard(
                     width: double.infinity,
                     height: 180,
 
-                    color:
-                        FolktriColors.lightLavender,
+                    color: FolktriColors.lightLavender,
 
                     alignment: Alignment.center,
 
                     child: const Column(
-                      mainAxisSize:
-                          MainAxisSize.min,
+                      mainAxisSize: MainAxisSize.min,
 
                       children: [
                         Icon(
                           Icons.image_not_supported_outlined,
-                          color:
-                              FolktriColors.primaryIndigo,
+                          color: FolktriColors.primaryIndigo,
                           size: 34,
                         ),
 
@@ -1374,8 +2116,7 @@ Widget buildMilestoneFeedCard(
                         Text(
                           'Unable to load milestone photo',
                           style: TextStyle(
-                            color:
-                                FolktriColors.secondaryText,
+                            color: FolktriColors.secondaryText,
                             fontSize: 12,
                           ),
                         ),
@@ -1408,8 +2149,7 @@ Widget buildMilestoneFeedCard(
                   const Text(
                     'A special family moment',
                     style: TextStyle(
-                      color:
-                          FolktriColors.secondaryText,
+                      color: FolktriColors.secondaryText,
                       fontSize: 12,
                     ),
                   ),
@@ -1421,8 +2161,7 @@ Widget buildMilestoneFeedCard(
                     const Text(
                       'View profile',
                       style: TextStyle(
-                        color:
-                            FolktriColors.primaryIndigo,
+                        color: FolktriColors.primaryIndigo,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1432,8 +2171,7 @@ Widget buildMilestoneFeedCard(
 
                     const Icon(
                       Icons.arrow_forward_ios_rounded,
-                      color:
-                          FolktriColors.primaryIndigo,
+                      color: FolktriColors.primaryIndigo,
                       size: 12,
                     ),
                   ],
@@ -1445,148 +2183,6 @@ Widget buildMilestoneFeedCard(
       ),
     ),
   );
-
-  // if (childData != null) {
-  //   final firstName =
-  //       childData['first_name'] ?? '';
-
-  //   final middleName =
-  //       childData['middle_name'] ?? '';
-
-  //   final lastName =
-  //       childData['last_name'] ?? '';
-
-  //   childName = [
-  //     firstName,
-  //     middleName,
-  //     lastName,
-  //   ]
-  //       .where(
-  //         (name) =>
-  //             name
-  //                 .toString()
-  //                 .trim()
-  //                 .isNotEmpty,
-  //       )
-  //       .join(' ');
-  // }
-
-  // return Card(
-  //   margin: const EdgeInsets.only(
-  //     bottom: 16,
-  //   ),
-  //   child: InkWell(
-  //     borderRadius:
-  //         BorderRadius.circular(12),
-  //     onTap: () {
-  //       final childId =
-  //           milestone['child_id'];
-
-  //       if (childId != null) {
-  //         context.push(
-  //           '/child/$childId',
-  //         );
-  //       }
-  //     },
-  //     child: Padding(
-  //       padding:
-  //           const EdgeInsets.all(16),
-  //       child: Column(
-  //         crossAxisAlignment:
-  //             CrossAxisAlignment.start,
-  //         children: [
-  //           Row(
-  //             children: [
-  //               const CircleAvatar(
-  //                 child: Icon(
-  //                   Icons.emoji_events,
-  //                 ),
-  //               ),
-
-  //               const SizedBox(
-  //                 width: 12,
-  //               ),
-
-  //               Expanded(
-  //                 child: Text(
-  //                   '$childName reached a milestone',
-  //                   style:
-  //                       const TextStyle(
-  //                     fontWeight:
-  //                         FontWeight.bold,
-  //                   ),
-  //                 ),
-  //               ),
-  //             ],
-  //           ),
-
-  //           const SizedBox(
-  //             height: 16,
-  //           ),
-
-  //           if (milestone[
-  //                   'photo_url'] !=
-  //               null)
-  //             ClipRRect(
-  //               borderRadius:
-  //                   BorderRadius.circular(
-  //                 12,
-  //               ),
-  //               child: Image.network(
-  //                 milestone[
-  //                     'photo_url'],
-  //                 width:
-  //                     double.infinity,
-  //                 height: 220,
-  //                 fit:
-  //                     BoxFit.cover,
-  //               ),
-  //             ),
-
-  //           if (milestone[
-  //                   'photo_url'] !=
-  //               null)
-  //             const SizedBox(
-  //               height: 16,
-  //             ),
-
-  //           Text(
-  //             milestone['title'] ?? '',
-  //             style:
-  //                 Theme.of(context)
-  //                     .textTheme
-  //                     .titleLarge,
-  //           ),
-
-  //           if (milestone[
-  //                   'description'] !=
-  //               null) ...[
-  //             const SizedBox(
-  //               height: 8,
-  //             ),
-  //             Text(
-  //               milestone[
-  //                   'description'],
-  //             ),
-  //           ],
-
-  //           const SizedBox(
-  //             height: 12,
-  //           ),
-
-  //           Text(
-  //             milestone['event_date']
-  //                 .toString(),
-  //             style:
-  //                 Theme.of(context)
-  //                     .textTheme
-  //                     .bodySmall,
-  //           ),
-  //         ],
-  //       ),
-  //     ),
-  //   ),
-  // );
 }
 
 Future<void> loadUpcomingEvents() async {
