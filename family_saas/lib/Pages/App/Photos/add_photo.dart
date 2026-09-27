@@ -57,30 +57,21 @@ class _AddPhotoPageState
     });
   }
 
-  Future<String> uploadPhoto({
-    required String photoId,
-  }) async {
-    final extension =
-        selectedImage!.name
-            .split('.')
-            .last;
+  Future<String> uploadPhoto({required String photoId,}) async {
+    
+    final extension = selectedImage!.name.split('.').last;
 
-    final filePath =
-        '${widget.familyId}/$photoId/photo.$extension';
+    final filePath = '${widget.familyId}/$photoId/photo.$extension';
 
     await supabase.storage
-        .from('family-photos')
+        .from('family_photos')
         .uploadBinary(
           filePath,
           selectedImageBytes!,
-          fileOptions:
-              const FileOptions(
-            upsert: true,
-          ),
         );
 
     return supabase.storage
-        .from('family-photos')
+        .from('family_photos')
         .getPublicUrl(filePath);
   }
 

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../Styling/folktri_colors.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class FamilyCalendarPage extends StatefulWidget {
   final String familyId;
@@ -2413,10 +2414,6 @@ Future<void> loadChildren() async {
 
         title: const Text(
           'Family Calendar',
-          style: TextStyle(
-            fontWeight:
-                FontWeight.bold,
-          ),
         ),
 
         centerTitle: true,
@@ -2486,7 +2483,7 @@ Future<void> loadChildren() async {
 
       // PROFILE
       case 4:
-        context.go('/profile');
+        context.go('/notifications');
         break;
     }
   },
@@ -2533,13 +2530,9 @@ Future<void> loadChildren() async {
     ),
 
     BottomNavigationBarItem(
-      icon: Icon(
-        Icons.person_outline_rounded,
-      ),
-      activeIcon: Icon(
-        Icons.person_rounded,
-      ),
-      label: 'Profile',
+      icon: Icon(Icons.notifications_outlined),
+      activeIcon: Icon(Icons.notifications_rounded),
+      label: 'Notifications',
     ),
   ],
 ),

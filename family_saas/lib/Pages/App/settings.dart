@@ -22,8 +22,10 @@ class _SettingsPageState extends State<SettingsPage> {
   bool isDeletingAccount = false;
   bool deleteSharedPhotos = false;
 
-  bool get isProcessing =>
-      isLoggingOut || isDeletingAccount;
+  // Child IDs the user explicitly chose to permanently delete.
+  final Set<String> childIdsToDelete = {};
+
+  bool get isProcessing => isLoggingOut || isDeletingAccount;
 
   // ---------------------------------------------------------
   // LOG OUT
@@ -168,7 +170,12 @@ class _SettingsPageState extends State<SettingsPage> {
   // ---------------------------------------------------------
 
   Future<void> deleteAccount() async {
-  if (isProcessing) return;
+    if (isProcessing) return;
+
+    // Always reset destructive choices when starting
+    // a brand-new deletion attempt.
+    deleteSharedPhotos = false;
+    childIdsToDelete.clear();
 
   final shouldContinue = await showDialog<bool>(
     context: context,
@@ -190,8 +197,8 @@ class _SettingsPageState extends State<SettingsPage> {
           'Deleting your Folktri account is permanent. '
           'If you own a family, you must transfer ownership '
           'or delete that family first.\n\n'
-          'You will also be able to choose what happens '
-          'to photos you have shared with your family.',
+          'You will also be able to choose what happens to eligible child profiles you originally'
+          'added and photos you shared with your families.',
           style: TextStyle(
             color: FolktriColors.secondaryText,
             height: 1.5,
@@ -219,7 +226,555 @@ class _SettingsPageState extends State<SettingsPage> {
 
   if (!mounted || shouldContinue != true) return;
 
-  await chooseSharedPhotoDeletion();
+  await chooseChildDeletion();
+}
+
+  Future<void> chooseChildDeletion() async {
+  final user = supabase.auth.currentUser;
+
+  if (user == null) {
+    showMessage(
+      'Unable to verify your account. Please sign in again.',
+    );
+    return;
+  }
+
+  try {
+    // -----------------------------------------
+    // Find children originally added by user.
+    // -----------------------------------------
+
+    final childResponse =
+        await supabase
+            .from('Children')
+            .select(
+              'id, family_id, first_name, middle_name, last_name',
+            )
+            .eq(
+              'created_by',
+              user.id,
+            )
+            .order('first_name');
+
+    final children =
+        List<Map<String, dynamic>>.from(
+      childResponse,
+    );
+
+    // If they never added a child, skip this
+    // step completely.
+    if (children.isEmpty) {
+      if (!mounted) return;
+
+      await chooseSharedPhotoDeletion();
+      return;
+    }
+
+    // -----------------------------------------
+    // Determine which children this user STILL
+    // has permission to manage.
+    // -----------------------------------------
+
+    final familyIds = children
+        .map(
+          (child) =>
+              child['family_id']
+                  ?.toString(),
+        )
+        .whereType<String>()
+        .where(
+          (id) => id.isNotEmpty,
+        )
+        .toSet()
+        .toList();
+
+    if (familyIds.isEmpty) {
+      if (!mounted) return;
+
+      await chooseSharedPhotoDeletion();
+      return;
+    }
+
+    final membershipResponse =
+        await supabase
+            .from('Family_Members')
+            .select(
+              'family_id, status, can_edit_child',
+            )
+            .eq(
+              'user_id',
+              user.id,
+            )
+            .eq(
+              'status',
+              'approved',
+            )
+            .eq(
+              'can_edit_child',
+              true,
+            )
+            .inFilter(
+              'family_id',
+              familyIds,
+            );
+
+    final memberships =
+        List<Map<String, dynamic>>.from(
+      membershipResponse,
+    );
+
+    final editableFamilyIds =
+        memberships
+            .map(
+              (membership) =>
+                  membership['family_id']
+                      ?.toString(),
+            )
+            .whereType<String>()
+            .toSet();
+
+    final eligibleChildren =
+        children.where((child) {
+      final familyId =
+          child['family_id']?.toString();
+
+      return familyId != null &&
+          editableFamilyIds.contains(
+            familyId,
+          );
+    }).toList();
+
+    // Children the user created but no longer
+    // has permission to manage are automatically
+    // kept. There is no delete option for them.
+    if (eligibleChildren.isEmpty) {
+      if (!mounted) return;
+
+      await chooseSharedPhotoDeletion();
+      return;
+    }
+
+    if (!mounted) return;
+
+    final selectedIds =
+        <String>{};
+
+    final shouldContinue =
+        await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder:
+              (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor:
+                  FolktriColors.surface,
+              shape:
+                  RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.circular(
+                  20,
+                ),
+              ),
+              title: const Text(
+                'Children You Added',
+                style: TextStyle(
+                  color: FolktriColors
+                      .midnightIndigo,
+                  fontWeight:
+                      FontWeight.w700,
+                ),
+              ),
+              content: SizedBox(
+                width: 460,
+                child:
+                    SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize:
+                        MainAxisSize.min,
+                    crossAxisAlignment:
+                        CrossAxisAlignment
+                            .start,
+                    children: [
+                      const Text(
+                        'Choose what should happen to each eligible '
+                        'child profile you originally added.',
+                        style: TextStyle(
+                          color:
+                              FolktriColors
+                                  .secondaryText,
+                          height: 1.5,
+                        ),
+                      ),
+
+                      const SizedBox(
+                        height: 10,
+                      ),
+
+                      const Text(
+                        'Keep is selected by default.',
+                        style: TextStyle(
+                          color:
+                              FolktriColors
+                                  .secondaryText,
+                          fontSize: 12,
+                          fontWeight:
+                              FontWeight.w600,
+                        ),
+                      ),
+
+                      const SizedBox(
+                        height: 18,
+                      ),
+
+                      ...eligibleChildren
+                          .map((child) {
+                        final childId =
+                            child['id']
+                                .toString();
+
+                        final firstName =
+                            child['first_name']
+                                    ?.toString()
+                                    .trim() ??
+                                '';
+
+                        final middleName =
+                            child['middle_name']
+                                    ?.toString()
+                                    .trim() ??
+                                '';
+
+                        final lastName =
+                            child['last_name']
+                                    ?.toString()
+                                    .trim() ??
+                                '';
+
+                        final fullName = [
+                          firstName,
+                          middleName,
+                          lastName,
+                        ]
+                            .where(
+                              (part) =>
+                                  part.isNotEmpty,
+                            )
+                            .join(' ');
+
+                        final displayName =
+                            fullName.isEmpty
+                                ? 'Child profile'
+                                : fullName;
+
+                        final shouldDelete =
+                            selectedIds
+                                .contains(
+                          childId,
+                        );
+
+                        return Container(
+                          margin:
+                              const EdgeInsets
+                                  .only(
+                            bottom: 16,
+                          ),
+                          padding:
+                              const EdgeInsets
+                                  .all(14),
+                          decoration:
+                              BoxDecoration(
+                            color:
+                                FolktriColors
+                                    .background,
+                            borderRadius:
+                                BorderRadius
+                                    .circular(
+                              16,
+                            ),
+                            border:
+                                Border.all(
+                              color:
+                                  FolktriColors
+                                      .lightLavender,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment
+                                    .start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 38,
+                                    height: 38,
+                                    decoration:
+                                        BoxDecoration(
+                                      color: FolktriColors
+                                          .lightLavender,
+                                      borderRadius:
+                                          BorderRadius
+                                              .circular(
+                                        12,
+                                      ),
+                                    ),
+                                    child:
+                                        const Icon(
+                                      Icons
+                                          .child_care_rounded,
+                                      color: FolktriColors
+                                          .primaryIndigo,
+                                      size: 21,
+                                    ),
+                                  ),
+
+                                  const SizedBox(
+                                    width: 10,
+                                  ),
+
+                                  Expanded(
+                                    child: Text(
+                                      displayName,
+                                      style:
+                                          const TextStyle(
+                                        color: FolktriColors
+                                            .midnightIndigo,
+                                        fontWeight:
+                                            FontWeight
+                                                .w700,
+                                        fontSize:
+                                            15,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(
+                                height: 10,
+                              ),
+
+                              RadioListTile<
+                                  bool>(
+                                value: false,
+                                groupValue:
+                                    shouldDelete,
+                                activeColor:
+                                    FolktriColors
+                                        .primaryIndigo,
+                                contentPadding:
+                                    EdgeInsets
+                                        .zero,
+                                title:
+                                    const Text(
+                                  'Keep profile',
+                                  style:
+                                      TextStyle(
+                                    color: FolktriColors
+                                        .midnightIndigo,
+                                    fontWeight:
+                                        FontWeight
+                                            .w700,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '$displayName will remain part of the family.',
+                                ),
+                                onChanged:
+                                    (value) {
+                                  if (value ==
+                                      null) {
+                                    return;
+                                  }
+
+                                  setDialogState(
+                                    () {
+                                      if (value) {
+                                        selectedIds
+                                            .add(
+                                          childId,
+                                        );
+                                      } else {
+                                        selectedIds
+                                            .remove(
+                                          childId,
+                                        );
+                                      }
+                                    },
+                                  );
+                                },
+                              ),
+
+                              RadioListTile<
+                                  bool>(
+                                value: true,
+                                groupValue:
+                                    shouldDelete,
+                                activeColor:
+                                    Colors.red,
+                                contentPadding:
+                                    EdgeInsets
+                                        .zero,
+                                title:
+                                    const Text(
+                                  'Permanently delete',
+                                  style:
+                                      TextStyle(
+                                    color: FolktriColors
+                                        .midnightIndigo,
+                                    fontWeight:
+                                        FontWeight
+                                            .w700,
+                                  ),
+                                ),
+                                subtitle:
+                                    const Text(
+                                  'The child profile and associated '
+                                  'family data will be permanently removed.',
+                                ),
+                                onChanged:
+                                    (value) {
+                                  if (value ==
+                                      null) {
+                                    return;
+                                  }
+
+                                  setDialogState(
+                                    () {
+                                      if (value) {
+                                        selectedIds
+                                            .add(
+                                          childId,
+                                        );
+                                      } else {
+                                        selectedIds
+                                            .remove(
+                                          childId,
+                                        );
+                                      }
+                                    },
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+
+                      if (selectedIds
+                          .isNotEmpty) ...[
+                        const SizedBox(
+                          height: 4,
+                        ),
+                        Container(
+                          padding:
+                              const EdgeInsets
+                                  .all(12),
+                          decoration:
+                              BoxDecoration(
+                            color: Colors.red
+                                .withOpacity(
+                              0.06,
+                            ),
+                            borderRadius:
+                                BorderRadius
+                                    .circular(
+                              12,
+                            ),
+                          ),
+                          child:
+                              const Text(
+                            'Deleting a child profile may permanently '
+                            'remove its photos, milestones, documents, '
+                            'calendar events, and feeding history. '
+                            'This cannot be undone.',
+                            style:
+                                TextStyle(
+                              color:
+                                  FolktriColors
+                                      .secondaryText,
+                              fontSize: 12,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () =>
+                      Navigator.pop(
+                    dialogContext,
+                    false,
+                  ),
+                  child:
+                      const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton
+                      .styleFrom(
+                    backgroundColor:
+                        FolktriColors
+                            .primaryIndigo,
+                    foregroundColor:
+                        FolktriColors
+                            .surface,
+                  ),
+                  onPressed: () {
+                    childIdsToDelete
+                      ..clear()
+                      ..addAll(
+                        selectedIds,
+                      );
+
+                    Navigator.pop(
+                      dialogContext,
+                      true,
+                    );
+                  },
+                  child:
+                      const Text('Continue'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (!mounted ||
+        shouldContinue != true) {
+      return;
+    }
+
+    await chooseSharedPhotoDeletion();
+  } on PostgrestException catch (e) {
+    debugPrint(
+      'LOAD DELETE-ACCOUNT CHILDREN ERROR: '
+      '${e.message}',
+    );
+
+    if (!mounted) return;
+
+    showMessage(
+      'Unable to load child profile options. Please try again.',
+    );
+  } catch (e) {
+    debugPrint(
+      'LOAD DELETE-ACCOUNT CHILDREN ERROR: $e',
+    );
+
+    if (!mounted) return;
+
+    showMessage(
+      'Unable to load child profile options. Please try again.',
+    );
+  }
 }
 
 Future<void> chooseSharedPhotoDeletion() async {
@@ -256,6 +811,29 @@ Future<void> chooseSharedPhotoDeletion() async {
                     height: 1.5,
                   ),
                 ),
+                if (childIdsToDelete.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: FolktriColors.lightLavender
+                          .withOpacity(0.45),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Photos associated with a child profile you chose '
+                      'to permanently delete will also be removed, '
+                      'regardless of the photo choice below.',
+                      style: TextStyle(
+                        color: FolktriColors.secondaryText,
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 20),
 
                 RadioListTile<bool>(
@@ -350,6 +928,11 @@ Future<void> chooseSharedPhotoDeletion() async {
 }
 
 Future<void> confirmPermanentDeletion() async {
+
+  final deletingChildren = childIdsToDelete.isNotEmpty;
+
+  final childCount = childIdsToDelete.length;
+
   final confirmed = await showDialog<bool>(
     context: context,
     barrierDismissible: false,
@@ -367,18 +950,30 @@ Future<void> confirmPermanentDeletion() async {
           ),
         ),
         content: Text(
-          deleteSharedPhotos
+          deletingChildren
+            ? deleteSharedPhotos
+            ? 'Your account, $childCount selected '
+              '${childCount == 1 ? 'child profile' : 'child profiles'}, '
+              'their associated family data, and photos you uploaded '
+              'to your families will be permanently deleted. '
+              'This cannot be undone.'
+            : 'Your account and $childCount selected '
+              '${childCount == 1 ? 'child profile' : 'child profiles'} '
+              'and their associated family data will be permanently '
+              'deleted. Other photos you uploaded will remain available '
+              'to your families. This cannot be undone.'
+            : deleteSharedPhotos
               ? 'Your account and the photos you uploaded '
-                  'to your families will be permanently deleted. '
-                  'This cannot be undone.'
+              'to your families will be permanently deleted. '
+              'This cannot be undone.'
               : 'Your account will be permanently deleted. '
-                  'Photos you uploaded to your families will remain '
-                  'available to them. This cannot be undone.',
-          style: const TextStyle(
-            color: FolktriColors.secondaryText,
-            height: 1.5,
+                'Photos you uploaded to your families will remain '
+                'available to them. This cannot be undone.',
+            style: const TextStyle(
+              color: FolktriColors.secondaryText,
+              height: 1.5,
+            ),
           ),
-        ),
         actions: [
           TextButton(
             onPressed: () =>
@@ -420,6 +1015,7 @@ Future<void> confirmPermanentDeletion() async {
         'delete-account',
         body: {
           'delete_shared_photos': deleteSharedPhotos,
+          'delete_child_ids': childIdsToDelete.toList(),
         }
       );
 

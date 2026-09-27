@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../Styling/folktri_colors.dart';
 
+// This is the FAMILY PROFILE page.
+
 class FamilyPage extends StatefulWidget {
   final String familyId;
 
@@ -795,6 +797,304 @@ Widget buildChildAvatar(
   return activity;
 }
 
+Widget buildUpcomingEventsSection() {
+  final now = DateTime.now();
+
+  final upcoming = events.where((event) {
+    final startAt = DateTime.tryParse(
+      event['start_at']?.toString() ?? '',
+    );
+
+    if (startAt == null) {
+      return false;
+    }
+
+    return !startAt.toLocal().isBefore(now);
+  }).toList()
+    ..sort((a, b) {
+      final aDate = DateTime.parse(
+        a['start_at'].toString(),
+      ).toLocal();
+
+      final bDate = DateTime.parse(
+        b['start_at'].toString(),
+      ).toLocal();
+
+      return aDate.compareTo(bDate);
+    });
+
+  final visibleEvents =
+      upcoming.take(3).toList();
+
+  return Column(
+    crossAxisAlignment:
+        CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'Upcoming Events',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight:
+                    FontWeight.w800,
+                color: FolktriColors
+                    .midnightIndigo,
+              ),
+            ),
+          ),
+
+          TextButton.icon(
+            onPressed: () async {
+              final result =
+                  await context.push<bool>(
+                '/family/${widget.familyId}'
+                '/calendar/add-event',
+              );
+
+              if (result == true) {
+                await loadFamilyData();
+              }
+            },
+            icon: const Icon(
+              Icons.add_rounded,
+              size: 18,
+            ),
+            label:
+                const Text('Add Event'),
+            style: TextButton.styleFrom(
+              foregroundColor:
+                  FolktriColors
+                      .primaryIndigo,
+            ),
+          ),
+        ],
+      ),
+
+      const SizedBox(height: 8),
+
+      if (visibleEvents.isEmpty)
+        Container(
+          width: double.infinity,
+          padding:
+              const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: FolktriColors.surface,
+            borderRadius:
+                BorderRadius.circular(18),
+            border: Border.all(
+              color: FolktriColors
+                  .lightLavender,
+            ),
+          ),
+          child: Column(
+            children: [
+              const Icon(
+                Icons
+                    .calendar_month_outlined,
+                color: FolktriColors
+                    .primaryIndigo,
+                size: 32,
+              ),
+
+              const SizedBox(height: 8),
+
+              const Text(
+                'No upcoming events',
+                style: TextStyle(
+                  color: FolktriColors
+                      .midnightIndigo,
+                  fontWeight:
+                      FontWeight.w700,
+                ),
+              ),
+
+              const SizedBox(height: 4),
+
+              const Text(
+                'Add an event to keep your family schedule organized.',
+                textAlign:
+                    TextAlign.center,
+                style: TextStyle(
+                  color: FolktriColors
+                      .secondaryText,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        )
+      else
+        ...visibleEvents.map(
+          buildUpcomingFamilyEventCard,
+        ),
+
+      const SizedBox(height: 6),
+
+      Align(
+        alignment:
+            Alignment.centerRight,
+        child: TextButton.icon(
+          onPressed: () {
+            context.push(
+              '/family/${widget.familyId}/calendar',
+            );
+          },
+          label: const Text(
+            'View Calendar',
+          ),
+          icon: const Icon(
+            Icons
+                .arrow_forward_rounded,
+            size: 17,
+          ),
+          style: TextButton.styleFrom(
+            foregroundColor:
+                FolktriColors
+                    .primaryIndigo,
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+Widget buildUpcomingFamilyEventCard(
+  Map<String, dynamic> event,
+) {
+  final startAt =
+      DateTime.tryParse(
+    event['start_at']?.toString() ?? '',
+  )?.toLocal();
+
+  final title =
+      event['title']
+          ?.toString()
+          .trim();
+
+  final eventTitle =
+      title != null && title.isNotEmpty
+          ? title
+          : 'Family Event';
+
+  String dateLabel =
+      'Upcoming event';
+
+  if (startAt != null) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+
+    final time =
+        TimeOfDay.fromDateTime(
+      startAt,
+    ).format(context);
+
+    dateLabel =
+        '${months[startAt.month - 1]} '
+        '${startAt.day} • $time';
+  }
+
+  return Container(
+    width: double.infinity,
+    margin:
+        const EdgeInsets.only(
+      bottom: 10,
+    ),
+    padding:
+        const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: FolktriColors.surface,
+      borderRadius:
+          BorderRadius.circular(17),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black
+              .withOpacity(0.04),
+          blurRadius: 12,
+          offset:
+              const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: FolktriColors
+                .lightLavender
+                .withOpacity(0.65),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons
+                .calendar_month_rounded,
+            color: FolktriColors
+                .primaryIndigo,
+            size: 21,
+          ),
+        ),
+
+        const SizedBox(width: 12),
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+            children: [
+              Text(
+                eventTitle,
+                maxLines: 1,
+                overflow:
+                    TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: FolktriColors
+                      .primaryText,
+                  fontWeight:
+                      FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+
+              const SizedBox(height: 4),
+
+              Text(
+                dateLabel,
+                style: const TextStyle(
+                  color: FolktriColors
+                      .secondaryText,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const Icon(
+          Icons
+              .chevron_right_rounded,
+          color:
+              FolktriColors.secondaryText,
+        ),
+      ],
+    ),
+  );
+}
+
 Widget buildRecentActivity() {
   final activity =
       getFamilyActivity();
@@ -1075,96 +1375,6 @@ void openFamilyTimeline() {
 
   @override
   Widget build(BuildContext context) {
-    void showFamilyAddMenu() {
-  showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    backgroundColor:
-        FolktriColors.surface,
-
-    builder: (sheetContext) {
-      return SafeArea(
-        child: Padding(
-          padding:
-              const EdgeInsets.fromLTRB(
-            16,
-            4,
-            16,
-            20,
-          ),
-          child: Column(
-            mainAxisSize:
-                MainAxisSize.min,
-            children: [
-              const Text(
-                'Add to your family',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight:
-                      FontWeight.w800,
-                  color:
-                      FolktriColors.midnightIndigo,
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              ListTile(
-                leading: const Icon(
-                  Icons.calendar_month_rounded,
-                  color:
-                      FolktriColors.primaryIndigo,
-                ),
-                title:
-                    const Text('Add Event'),
-                onTap: () async {
-                  Navigator.pop(
-                    sheetContext,
-                  );
-
-                  final result =
-                      await context.push<bool>(
-                    '/family/${widget.familyId}'
-                    '/calendar/add-event',
-                  );
-
-                  if (result == true) {
-                    await loadFamilyData();
-                  }
-                },
-              ),
-
-              ListTile(
-                leading: const Icon(
-                  Icons.child_care_rounded,
-                  color:
-                      FolktriColors.connectionTeal,
-                ),
-                title:
-                    const Text('Add Child'),
-                onTap: () async {
-                  Navigator.pop(
-                    sheetContext,
-                  );
-
-                  final result =
-                      await context.push(
-                    '/family/${widget.familyId}'
-                    '/add-children',
-                  );
-
-                  if (result == true) {
-                    await loadFamilyData();
-                  }
-                },
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
 
     if (isLoading) {
       return const Scaffold(
@@ -1290,7 +1500,11 @@ void openFamilyTimeline() {
           children: [
             buildChildrenSection(),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
+
+            buildUpcomingEventsSection(),
+
+            const SizedBox(height: 24),
 
             buildRecentActivity(),
           ],
@@ -1299,24 +1513,6 @@ void openFamilyTimeline() {
     ],
   ),
 ),
-
-floatingActionButton:
-    FloatingActionButton(
-  backgroundColor:
-      FolktriColors.primaryIndigo,
-
-  foregroundColor:
-      FolktriColors.surface,
-
-  onPressed:
-      showFamilyAddMenu,
-
-  child: const Icon(
-    Icons.add_rounded,
-    size: 30,
-  ),
-),
-
 
     );
   }

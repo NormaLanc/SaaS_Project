@@ -311,6 +311,10 @@ Future<void> handleAddButton() async {
       break;
 
     case 1:
+      await addChildEvent();
+      break;
+
+    case 2:    
       final result =
           await context.push<bool>(
         '/family/${child!['family_id']}'
@@ -322,10 +326,6 @@ Future<void> handleAddButton() async {
         await loadPhotos();
       }
 
-      break;
-
-    case 2:
-      await addChildEvent();
       break;
 
     case 3:
@@ -482,58 +482,117 @@ Widget buildPhotosTab(){
                       ),
                     )
                   : GridView.builder(
-                      padding: const EdgeInsets.all(8),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 4,
-                        mainAxisSpacing: 4,
-                      ),
-                      itemCount: photos.length,
-                      itemBuilder:
-                          (context, index,) {
-                        final photo = photos[index];
+  padding: const EdgeInsets.all(8),
+  gridDelegate:
+      const SliverGridDelegateWithFixedCrossAxisCount(
+    crossAxisCount: 3,
+    crossAxisSpacing: 4,
+    mainAxisSpacing: 4,
+  ),
+  itemCount: photos.length,
+  itemBuilder: (context, index) {
+    final photo = photos[index];
 
-                        return Stack(
-                          children: [
-                            Positioned.fill(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(8,),
-                                child: Image.network(photo['photo_url'],
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ),
+    final photoUrl =
+        photo['photo_url']
+            ?.toString()
+            .trim();
 
-                            Positioned(
-                              top: 4,
-                              right: 4,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.black54,
-                                  borderRadius: BorderRadius.circular(20,),
-                                ),
+    final hasValidPhotoUrl =
+        photoUrl != null &&
+        photoUrl.isNotEmpty &&
+        Uri.tryParse(photoUrl)
+                ?.hasAbsolutePath ==
+            true;
 
-                              child: IconButton(
-                                icon: const Icon(Icons.delete_outline,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: ClipRRect(
+            borderRadius:
+                BorderRadius.circular(8),
+            child: hasValidPhotoUrl
+                ? Image.network(
+                    photoUrl,
+                    fit: BoxFit.cover,
 
-                                onPressed: () {
-                                  deletePhoto(photo['id'].toString(),
-                                  );
-                                },
-                              ),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
+                    errorBuilder: (
+                      context,
+                      error,
+                      stackTrace,
+                    ) {
+                      debugPrint(
+                        'Unable to display photo: '
+                        '$error',
+                      );
+
+                      return _buildPhotoErrorTile();
+                    },
+                  )
+                : _buildPhotoErrorTile(),
+          ),
+        ),
+
+        Positioned(
+          top: 4,
+          right: 4,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black54,
+              borderRadius:
+                  BorderRadius.circular(20),
+            ),
+            child: IconButton(
+              icon: const Icon(
+                Icons.delete_outline,
+                color: Colors.white,
+                size: 20,
+              ),
+              onPressed: () {
+                deletePhoto(
+                  photo['id'].toString(),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  },
+),
                   ),
                 ],
               );
             }
+
+Widget _buildPhotoErrorTile() {
+  return Container(
+    color: FolktriColors.lightLavender,
+    child: const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.broken_image_outlined,
+            color:
+                FolktriColors.primaryIndigo,
+            size: 30,
+          ),
+          SizedBox(height: 5),
+          Text(
+            'Photo unavailable',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color:
+                  FolktriColors.secondaryText,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
 Widget buildDocumentsTab() {
   if (isLoadingDocuments) {

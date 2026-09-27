@@ -23,6 +23,11 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
   List<Map<String, dynamic>> feedItems = [];
   bool isLoadingFeed = true;
 
+  Map<String, int> photoLikeCounts = {};
+  Set<String> likedPhotoIds = {};
+
+  bool isUpdatingLike = false;
+
   List<Map<String, dynamic>> upcomingEvents = [];
   bool isLoadingEvents = true;
 
@@ -440,6 +445,8 @@ Future<void> loadFeed() async {
       feedItems = combinedFeed;
       isLoadingFeed = false;
     });
+
+    await loadPhotoLikes();
   } catch (e) {
     debugPrint(
       'Unable to load dashboard feed: $e',
@@ -450,6 +457,150 @@ Future<void> loadFeed() async {
     setState(() {
       isLoadingFeed = false;
     });
+  }
+}
+
+Future<void> loadPhotoLikes() async {
+  final user = supabase.auth.currentUser;
+
+  if (user == null) return;
+
+  try {
+    final photoIds = feedItems
+        .where(
+          (item) => item['type'] == 'photo',
+        )
+        .map(
+          (item) => item['id']?.toString(),
+        )
+        .whereType<String>()
+        .where(
+          (id) => id.isNotEmpty,
+        )
+        .toList();
+
+    if (photoIds.isEmpty) {
+      if (!mounted) return;
+
+      setState(() {
+        photoLikeCounts = {};
+        likedPhotoIds = {};
+      });
+
+      return;
+    }
+
+    final response = await supabase
+        .from('Photo_Likes')
+        .select(
+          'photo_id, user_id',
+        )
+        .inFilter(
+          'photo_id',
+          photoIds,
+        );
+
+    final likes =
+        List<Map<String, dynamic>>.from(
+      response,
+    );
+
+    final counts = <String, int>{};
+    final currentUserLikes = <String>{};
+
+    for (final like in likes) {
+      final photoId =
+          like['photo_id']?.toString();
+
+      final userId =
+          like['user_id']?.toString();
+
+      if (photoId == null) {
+        continue;
+      }
+
+      counts[photoId] =
+          (counts[photoId] ?? 0) + 1;
+
+      if (userId == user.id) {
+        currentUserLikes.add(photoId);
+      }
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      photoLikeCounts = counts;
+      likedPhotoIds = currentUserLikes;
+    });
+  } catch (e) {
+    debugPrint(
+      'Unable to load photo likes: $e',
+    );
+  }
+}
+
+Future<void> togglePhotoLike(
+  String photoId,
+) async {
+  final user = supabase.auth.currentUser;
+
+  if (user == null ||
+      isUpdatingLike) {
+    return;
+  }
+
+  final isLiked =
+      likedPhotoIds.contains(photoId);
+
+  try {
+    setState(() {
+      isUpdatingLike = true;
+    });
+
+    if (isLiked) {
+      await supabase
+          .from('Photo_Likes')
+          .delete()
+          .eq(
+            'photo_id',
+            photoId,
+          )
+          .eq(
+            'user_id',
+            user.id,
+          );
+    } else {
+      await supabase
+          .from('Photo_Likes')
+          .insert({
+        'photo_id': photoId,
+        'user_id': user.id,
+      });
+    }
+
+    await loadPhotoLikes();
+  } catch (e) {
+    debugPrint(
+      'Unable to update photo like: $e',
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(
+          'Unable to update like: $e',
+        ),
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() {
+        isUpdatingLike = false;
+      });
+    }
   }
 }
 
@@ -501,6 +652,15 @@ String childName = '';
 
   final photoUrl =
       photo['photo_url']?.toString() ?? '';
+
+  final photoId =
+    photo['id']?.toString() ?? '';
+
+  final likeCount =
+    photoLikeCounts[photoId] ?? 0;
+
+  final isLiked =
+    likedPhotoIds.contains(photoId);
 
   final createdAt = DateTime.tryParse(
     photo['created_at']?.toString() ?? '',
@@ -599,9 +759,7 @@ String childName = '';
 
         if (photoUrl.isNotEmpty)
           ClipRRect(
-            borderRadius: const BorderRadius.vertical(
-              bottom: Radius.circular(18),
-            ),
+            borderRadius: BorderRadius.zero,
             child: Image.network(
               photoUrl,
               width: double.infinity,
@@ -623,8 +781,126 @@ String childName = '';
                   ),
                 );
               },
+
+        
             ),
           ),
+
+          Padding(
+  padding: const EdgeInsets.symmetric(
+    horizontal: 14,
+    vertical: 10,
+  ),
+  child: Row(
+    children: [
+      InkWell(
+        borderRadius:
+            BorderRadius.circular(20),
+        onTap: photoId.isEmpty
+            ? null
+            : () {
+                togglePhotoLike(
+                  photoId,
+                );
+              },
+        child: Padding(
+          padding:
+              const EdgeInsets.symmetric(
+            horizontal: 6,
+            vertical: 6,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                isLiked
+                    ? Icons.favorite_rounded
+                    : Icons.favorite_border_rounded,
+                size: 22,
+                color: isLiked
+                    ? FolktriColors.dustyRose
+                    : FolktriColors
+                        .secondaryText,
+              ),
+
+              const SizedBox(
+                width: 6,
+              ),
+
+              Text(
+                likeCount == 1
+                    ? '1 like'
+                    : '$likeCount likes',
+                style: TextStyle(
+                  color: isLiked
+                      ? FolktriColors
+                          .dustyRose
+                      : FolktriColors
+                          .secondaryText,
+                  fontSize: 13,
+                  fontWeight:
+                      FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+
+      const SizedBox(
+        width: 18,
+      ),
+
+      InkWell(
+        borderRadius:
+            BorderRadius.circular(20),
+        onTap: () {
+          // Comments will be connected next.
+        },
+        child: const Padding(
+          padding:
+              EdgeInsets.symmetric(
+            horizontal: 6,
+            vertical: 6,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.chat_bubble_outline_rounded,
+                size: 21,
+                color: FolktriColors
+                    .secondaryText,
+              ),
+
+              SizedBox(
+                width: 6,
+              ),
+
+              Text(
+                'Comment',
+                style: TextStyle(
+                  color: FolktriColors
+                      .secondaryText,
+                  fontSize: 13,
+                  fontWeight:
+                      FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+
+      const Spacer(),
+
+      const Icon(
+        Icons.lock_outline_rounded,
+        size: 15,
+        color:
+            FolktriColors.secondaryText,
+      ),
+    ],
+  ),
+),
       ],
     ),
   );
@@ -2232,6 +2508,35 @@ Widget _todayCard({
           ),
         ),
         actions: [
+            // ==========================================
+            // PROFILE
+            // ==========================================
+          IconButton(
+            tooltip: 'Profile',
+            onPressed: () {
+              context.go('/profile');
+            },
+            icon: CircleAvatar(
+              radius: 17,
+              backgroundColor: FolktriColors.lightLavender,
+              backgroundImage:
+                profilePhotoUrl != null
+                ? NetworkImage(profilePhotoUrl!,)
+                : null,
+              child: profilePhotoUrl == null
+                ? const Icon(
+                    Icons.person_rounded,
+                    color: FolktriColors.primaryIndigo,
+                    size: 20,
+                  )
+                : null,
+              ),
+            ),
+
+          // ==========================================
+          // ADD FAMILY
+          // ==========================================
+
           IconButton(
             icon: const Icon(
               Icons.add,
@@ -2240,17 +2545,7 @@ Widget _todayCard({
             tooltip: "Add Family",
             onPressed: showFamilyOptions,
           ),
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_outlined,
-              color: FolktriColors.surface
-              ),
-            tooltip: "Notifications",
-            onPressed: () {
-              context.push('/notifications',);
-            },
-          ),  
-          // buildProfileHeader(),
+
            const SizedBox(width: 6,),
         ],
       ),
@@ -2322,7 +2617,7 @@ Widget _todayCard({
 
       case 4:
         // Open the user's profile.
-        context.go('/profile');//.then((_) {
+        context.go('/notifications');//.then((_) {
         //   if (mounted) {
         //     loadUserProfile();
         //   }
@@ -2357,9 +2652,9 @@ Widget _todayCard({
     ),
 
     BottomNavigationBarItem(
-      icon: Icon(Icons.person_outline),
-      activeIcon: Icon(Icons.person),
-      label: 'Profile',
+      icon: Icon(Icons.notifications_outlined),
+      activeIcon: Icon(Icons.notifications_rounded),
+      label: 'Notifications',
     ),
   ],
 ),

@@ -311,12 +311,12 @@ class _FamiliesPageState extends State<FamiliesPage> {
         elevation: 0,
         automaticallyImplyLeading: false,
         title:  Text(
-          'Your Families',
-          style: GoogleFonts.marckScript(
-            fontSize: 22,
-            fontWeight: FontWeight.w600,
-            color: FolktriColors.surface,
-          ),
+          'Families',
+          // style: GoogleFonts.marckScript(
+          //   fontSize: 22,
+          //   fontWeight: FontWeight.w600,
+          //   color: FolktriColors.surface,
+          // ),
         ),
         // leading: IconButton(
         //   tooltip: 'Back to dashboard',
@@ -466,7 +466,7 @@ class _FamiliesPageState extends State<FamiliesPage> {
 
             // PROFILE
             case 4:
-              context.go('/profile');
+              context.go('/notifications');
               break;
           }
         },
@@ -513,13 +513,9 @@ class _FamiliesPageState extends State<FamiliesPage> {
     ),
 
     BottomNavigationBarItem(
-      icon: Icon(
-        Icons.person_outline_rounded,
-      ),
-      activeIcon: Icon(
-        Icons.person_rounded,
-      ),
-      label: 'Profile',
+      icon: Icon(Icons.notifications_outlined),
+      activeIcon: Icon(Icons.notifications_rounded),
+      label: 'Notifications',
     ),
   ],
 ),
