@@ -20,8 +20,7 @@ class FamilyTimelinePage extends StatefulWidget {
       _FamilyTimelinePageState();
 }
 
-class _FamilyTimelinePageState
-    extends State<FamilyTimelinePage> {
+class _FamilyTimelinePageState extends State<FamilyTimelinePage> {
   final supabase = Supabase.instance.client;
 
   Map<String, dynamic>? family;
@@ -29,6 +28,8 @@ class _FamilyTimelinePageState
   List<Map<String, dynamic>> photos = [];
   List<Map<String, dynamic>> milestones = [];
   List<Map<String, dynamic>> events = [];
+  List<Map<String, dynamic>> posts = [];
+  Map<String, Map<String, dynamic>> postAuthorProfiles = {};
   List<Map<String, dynamic>> children = [];
 
   bool isLoading = true;
@@ -118,6 +119,74 @@ class _FamilyTimelinePageState
           );
 
       // -------------------------------------------------------
+      // FAMILY POSTS
+      // -------------------------------------------------------
+
+      final postsResponse = await supabase
+        .from('Family_Posts')
+        .select(
+          '''
+          id,
+          family_id,
+          created_by,
+          post_text,
+          created_at
+          ''',
+        )
+        .eq(
+          'family_id',
+          widget.familyId,
+        )
+        .order(
+          'created_at',
+          ascending: false,
+        );
+
+        final loadedPosts = List<Map<String, dynamic>>.from(postsResponse);
+
+        final postAuthorIds = loadedPosts
+          .map(
+            (post) => post['created_by']?.toString(),)
+          .whereType<String>()
+          .where(
+            (id) => id.isNotEmpty,
+          )
+          .toSet()
+          .toList();
+
+        Map<String, Map<String, dynamic>> loadedPostAuthorProfiles = {};
+
+        if (postAuthorIds.isNotEmpty) {
+          final profilesResponse =
+            await supabase
+              .from('Profiles')
+              .select(
+                '''
+                user_id,
+                first_name,
+                last_name,
+                profile_photo_path
+                ''',
+              )
+              .inFilter(
+                'user_id',
+                postAuthorIds,
+              );
+
+          final loadedProfiles = List<Map<String, dynamic>>.from(profilesResponse,);
+
+          for (final profile in loadedProfiles) {
+            final userId = profile['user_id']?.toString();
+
+            if (userId == null || userId.isEmpty) {
+              continue;
+            }
+
+            loadedPostAuthorProfiles[userId] = profile;
+          }
+        }
+
+      // -------------------------------------------------------
       // PHOTOS + MILESTONES
       // -------------------------------------------------------
 
@@ -163,20 +232,18 @@ class _FamilyTimelinePageState
       if (!mounted) return;
 
       setState(() {
-        family =
-            Map<String, dynamic>.from(
-          familyResponse,
-        );
+        family = Map<String, dynamic>.from(familyResponse,);
 
         children = loadedChildren;
 
         photos = loadedPhotos;
         milestones = loadedMilestones;
 
-        events =
-            List<Map<String, dynamic>>.from(
-          eventsResponse,
-        );
+        events = List<Map<String, dynamic>>.from(eventsResponse,);
+
+        posts = loadedPosts;
+
+        postAuthorProfiles = loadedPostAuthorProfiles;
 
         isLoading = false;
       });
@@ -270,6 +337,25 @@ class _FamilyTimelinePageState
     }
 
     // -------------------------------------------------------
+    // FAMILY POSTS
+    // -------------------------------------------------------
+
+    for (final post in posts) {
+      final date = DateTime.tryParse(
+        post['created_at']?.toString() ??
+        '',
+      );
+
+      if (date != null) {
+        activity.add({
+          'type': 'post',
+          'date': date.toLocal(),
+          'data': post,
+        });
+      }
+    }
+
+    // -------------------------------------------------------
     // FILTER
     // -------------------------------------------------------
 
@@ -330,40 +416,53 @@ class _FamilyTimelinePageState
   // =========================================================
 
   Widget buildFilterBar() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-
-      child: Row(
-        children: [
-          buildFilterChip(
-            label: 'All Activity',
-            value: 'all',
-          ),
-
-          const SizedBox(width: 8),
-
-          buildFilterChip(
-            label: 'Photos',
-            value: 'photo',
-          ),
-
-          const SizedBox(width: 8),
-
-          buildFilterChip(
-            label: 'Milestones',
-            value: 'milestone',
-          ),
-
-          const SizedBox(width: 8),
-
-          buildFilterChip(
-            label: 'Events',
-            value: 'event',
-          ),
-        ],
+  return Row(
+    children: [
+      Expanded(
+        child: buildFilterChip(
+          label: 'All',
+          value: 'all',
+        ),
       ),
-    );
-  }
+
+      const SizedBox(width: 6),
+
+      Expanded(
+        child: buildFilterChip(
+          label: 'Photos',
+          value: 'photo',
+        ),
+      ),
+
+      const SizedBox(width: 6),
+
+      Expanded(
+        child: buildFilterChip(
+          label: 'Milestones',
+          value: 'milestone',
+        ),
+      ),
+
+      const SizedBox(width: 6),
+
+      Expanded(
+        child: buildFilterChip(
+          label: 'Events',
+          value: 'event',
+        ),
+      ),
+
+      const SizedBox(width: 6),
+
+      Expanded(
+        child: buildFilterChip(
+          label: 'Posts',
+          value: 'post',
+        ),
+      ),
+    ],
+  );
+}
 
   Widget buildFilterChip({
     required String label,
@@ -390,7 +489,7 @@ class _FamilyTimelinePageState
 
         padding:
             const EdgeInsets.symmetric(
-          horizontal: 17,
+          horizontal: 4,
           vertical: 10,
         ),
 
@@ -406,6 +505,12 @@ class _FamilyTimelinePageState
 
         child: Text(
           label,
+
+            textAlign: TextAlign.center,
+
+            maxLines: 1,
+
+            overflow: TextOverflow.ellipsis,
 
           style: TextStyle(
             fontSize: 13,
@@ -508,51 +613,44 @@ class _FamilyTimelinePageState
   return null;
 }
 
-String getChildName(
-  String? childId,
-) {
-  if (childId == null ||
-      childId.isEmpty) {
-    return 'Family';
-  }
+  String getChildName(String? childId,) {
+    if (childId == null || childId.isEmpty) {
+      return 'Family';
+    }
 
-  final matchingChildren =
-      children.where(
-    (child) =>
-        child['id']?.toString() ==
-        childId,
-  );
+    final matchingChildren = children.where(
+      (child) => child['id']?.toString() == childId,
+    );
 
-  if (matchingChildren.isEmpty) {
-    return 'Family';
-  }
+    if (matchingChildren.isEmpty) {
+      return 'Family';
+    }
 
-  final child =
-      matchingChildren.first;
+    final child = matchingChildren.first;
 
-  final firstName =
+    final firstName =
       child['first_name']
           ?.toString()
           .trim() ??
       '';
 
-  final middleName =
+    final middleName =
       child['middle_name']
           ?.toString()
           .trim() ??
       '';
 
-  final lastName =
+    final lastName =
       child['last_name']
           ?.toString()
           .trim() ??
       '';
 
-  final fullName = [
-    firstName,
-    middleName,
-    lastName,
-  ]
+    final fullName = [
+      firstName,
+      middleName,
+      lastName,
+    ]
       .where(
         (name) =>
             name.isNotEmpty,
@@ -566,6 +664,122 @@ String getChildName(
   return firstName.isNotEmpty
       ? firstName
       : fullName;
+}
+
+  String getPostAuthorName(
+  Map<String, dynamic> post,
+) {
+  final createdBy =
+      post['created_by']?.toString();
+
+  if (createdBy == null ||
+      createdBy.isEmpty) {
+    return 'Family member';
+  }
+
+  final profile =
+      postAuthorProfiles[createdBy];
+
+  if (profile == null) {
+    return 'Family member';
+  }
+
+  final firstName =
+      profile['first_name']
+          ?.toString()
+          .trim() ??
+      '';
+
+  final lastName =
+      profile['last_name']
+          ?.toString()
+          .trim() ??
+      '';
+
+  final fullName = [
+    firstName,
+    lastName,
+  ]
+      .where(
+        (name) => name.isNotEmpty,
+      )
+      .join(' ');
+
+  return fullName.isNotEmpty
+      ? fullName
+      : 'Family member';
+}
+
+  Widget buildPostAuthorRow(
+  Map<String, dynamic> post,
+) {
+  final createdBy =
+      post['created_by']?.toString();
+
+  final profile =
+      createdBy != null
+          ? postAuthorProfiles[createdBy]
+          : null;
+
+  final authorName =
+      getPostAuthorName(post);
+
+  final profilePhotoPath =
+      profile?['profile_photo_path']
+          ?.toString()
+          .trim();
+
+  return Row(
+    children: [
+      CircleAvatar(
+        radius: 12,
+        backgroundColor:
+            FolktriColors.lightLavender,
+        backgroundImage:
+            profilePhotoPath != null &&
+                    profilePhotoPath
+                        .isNotEmpty
+                ? NetworkImage(
+                    profilePhotoPath,
+                  )
+                : null,
+        child:
+            profilePhotoPath == null ||
+                    profilePhotoPath
+                        .isEmpty
+                ? const Icon(
+                    Icons.person_rounded,
+                    size: 14,
+                    color: FolktriColors
+                        .primaryIndigo,
+                  )
+                : null,
+      ),
+
+      const SizedBox(width: 7),
+
+      Expanded(
+        child: Text(
+          authorName,
+
+          maxLines: 1,
+
+          overflow:
+              TextOverflow.ellipsis,
+
+          style: const TextStyle(
+            color:
+                FolktriColors.primaryText,
+
+            fontSize: 12,
+
+            fontWeight:
+                FontWeight.w700,
+          ),
+        ),
+      ),
+    ],
+  );
 }
 
   bool isFamilyActivity(String? childId) {
@@ -705,6 +919,24 @@ String getChildName(
         title = data['title']
                     ?.toString() ??
                 'Event';
+
+        break;
+
+      case 'post':
+        icon = Icons.chat_bubble_rounded;
+
+        color =FolktriColors.primaryIndigo;
+
+        typeLabel = 'Family Post';
+
+        final postText =
+          data['post_text']
+            ?.toString()
+            .trim();
+
+        title = postText != null && postText.isNotEmpty
+          ? postText
+          : 'Family Post';
 
         break;
 
@@ -899,6 +1131,12 @@ String getChildName(
       // -----------------------------------------
 
       buildActivityPersonChip(childId,),
+
+      if (type == 'post') ...[
+        const SizedBox(height: 8),
+
+        buildPostAuthorRow(data,),
+      ],
 
       const SizedBox(height: 8,),
 
@@ -1159,23 +1397,23 @@ String getChildName(
 
     switch (selectedFilter) {
       case 'photo':
-        message =
-            'No family photos yet.';
+        message = 'No family photos yet.';
         break;
 
       case 'milestone':
-        message =
-            'No family milestones yet.';
+        message = 'No family milestones yet.';
         break;
 
       case 'event':
-        message =
-            'No family events yet.';
+        message = 'No family events yet.';
+        break;
+
+      case 'post':
+        message = 'No family posts yet.';
         break;
 
       default:
-        message =
-            'Your family timeline will appear here.';
+        message = 'Your family timeline will appear here.';
     }
 
     return Padding(
@@ -1485,13 +1723,7 @@ Widget buildTimelineHeader() {
   // =========================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    // final familyName =
-    //     family?['family_name']
-    //             ?.toString() ??
-    //         'Family';
+  Widget build(BuildContext context,) {
 
     final groupedActivity =
         groupActivityByMonth();

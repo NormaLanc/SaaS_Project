@@ -92,7 +92,7 @@ class _AddMilestonePageState
         '${widget.familyId}/${widget.childId}/$milestoneId/photo.$extension';
 
     await supabase.storage
-        .from('milestone-images')
+        .from('family_photos')
         .uploadBinary(
           filePath,
           selectedImageBytes!,
@@ -103,7 +103,7 @@ class _AddMilestonePageState
         );
 
     return supabase.storage
-        .from('milestone-images')
+        .from('family_photos')
         .getPublicUrl(filePath);
   }
 
@@ -195,6 +195,27 @@ class _AddMilestonePageState
                 'id',
                 milestoneId,
               );
+
+          // -----------------------------------------
+          // ALSO REGISTER PHOTO IN FAMILY PHOTOS
+          // -----------------------------------------
+
+          await supabase
+            .from('Photos')
+            .insert({
+              'family_id':
+                widget.familyId,
+              'child_id':
+                widget.childId,
+              'created_by':
+                user.id,
+              'media_type':
+                'photo',
+              'photo_url':
+                photoUrl,
+              'caption':
+                titleController.text.trim(),
+            });
         }
       }
 

@@ -306,6 +306,7 @@ Future<void> handleAddButton() async {
 
       if (result == true) {
         await loadMilestones();
+        await loadPhotos();
       }
 
       break;
@@ -358,6 +359,7 @@ Widget buildMilestonesTab(){
                       );
                       if (result == true) {
                         loadMilestones();
+                        await loadPhotos();
                       }
                     },
                     icon: const Icon(Icons.add),
@@ -1829,26 +1831,6 @@ Widget build(BuildContext context) {
       ),
     );
   }
-
-  // final firstName =
-  //     child!['first_name'] ?? '';
-
-  // final middleName =
-  //     child!['middle_name'] ?? '';
-
-  // final lastName =
-  //     child!['last_name'] ?? '';
-
-  // final fullName = [
-  //   firstName,
-  //   middleName,
-  //   lastName,
-  // ]
-      // .where(
-      //   (name) =>
-      //       name.toString().trim().isNotEmpty,
-      // )
-      // .join(' ');
 
   return DefaultTabController(
     length: 4,
