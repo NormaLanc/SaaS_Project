@@ -163,6 +163,26 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
 
     // ==========================================
+    // OPEN FAMILY POST
+    // ==========================================
+    
+    if (referenceType == 'family_post' &&
+    referenceId.isNotEmpty &&
+    familyId.isNotEmpty) {
+      context.go(
+        Uri(
+          path: '/app',
+          queryParameters: {
+            'postId': referenceId,
+            'familyId': familyId,
+          },
+        ).toString(),
+      );
+
+      return;
+    }
+
+    // ==========================================
     // FAMILY JOIN REQUEST
     // ==========================================
 

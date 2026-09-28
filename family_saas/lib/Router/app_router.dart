@@ -85,14 +85,20 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/app',
-        builder: (context, state) {
-          final targetPhotoId = state.uri.queryParameters['photoId'];
+      builder: (context, state) {
+      final targetPhotoId = state.uri.queryParameters['photoId'];
 
-          return FamilyDashboard(
-            targetPhotoId: targetPhotoId,
-          );
-        },
-    ),
+      final targetPostId = state.uri.queryParameters['postId'];
+
+      final targetFamilyId = state.uri.queryParameters['familyId'];
+
+      return FamilyDashboard(
+        targetPhotoId: targetPhotoId,
+        targetPostId: targetPostId,
+        targetFamilyId: targetFamilyId,
+      );
+    },
+  ),
     GoRoute(
       path: '/settings',
       builder: (context, state) => const SettingsPage(),

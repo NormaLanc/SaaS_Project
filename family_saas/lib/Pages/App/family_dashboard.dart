@@ -9,9 +9,16 @@ import 'package:google_fonts/google_fonts.dart';
 class FamilyDashboard extends StatefulWidget {
   final String? targetPhotoId;
 
+  final String? targetPostId;
+
+  final String? targetFamilyId;
+
   const FamilyDashboard({
     super.key,
     this.targetPhotoId,
+    this.targetPostId,
+    this.targetFamilyId,
+
   });
 
 
@@ -33,6 +40,12 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
   String? highlightedPhotoId;
 
   bool hasScrolledToTargetPhoto = false;
+
+  final Map<String, GlobalKey> postCardKeys = {};
+
+  String? highlightedPostId;
+
+  bool hasScrolledToTargetPost = false;
 
   Map<String, int> photoLikeCounts = {};
   Set<String> likedPhotoIds = {};
@@ -90,12 +103,32 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
 
     if (!mounted) return;
 
-    await Future.wait([
-      loadFeed(),
-      loadUpcomingEvents(),
-      loadUserProfile(),
-    ]);
+  // If the user arrived from a notification,
+  // switch to the family that owns the target
+  // before loading the Dashboard feed.
+    final targetFamilyId = widget.targetFamilyId;
+
+    if (targetFamilyId != null && targetFamilyId.isNotEmpty) {
+      final canAccessTargetFamily = families.any(
+
+      (family) => family['id']?.toString() == targetFamilyId,
+
+      );
+
+    if (canAccessTargetFamily) {
+      setState(() {
+        selectedFamilyId =
+            targetFamilyId;
+      });
+    }
   }
+
+  await Future.wait([
+    loadFeed(),
+    loadUpcomingEvents(),
+    loadUserProfile(),
+  ]);
+}
 
   void _onQuickPostChanged() {
     if (!mounted) return;
@@ -377,107 +410,7 @@ Future<void> loadFeed() async {
       });
     }
 
-    // Your existing queries below use
-    // .inFilter('family_id', familyIds),
-    // so we keep familyIds as a List,
-    // but it now contains ONLY the
-    // selected family.
-    final familyIds = <String>[
-      familyId,
-    ];
-  // try {
-  //   final user =
-  //       supabase.auth.currentUser;
-
-  //   if (user == null) {
-  //     return;
-  //   }
-
-  //   // --------------------------------------------------
-  //   // 1. Get families this user owns.
-  //   // --------------------------------------------------
-
-  //   final ownedFamilyResponse =
-  //       await supabase
-  //           .from('Families')
-  //           .select('id')
-  //           .eq(
-  //             'created_by',
-  //             user.id,
-  //           );
-
-  //   final ownedFamilies =
-  //       List<Map<String, dynamic>>.from(
-  //     ownedFamilyResponse,
-  //   );
-
-  //   // --------------------------------------------------
-  //   // 2. Get families this user has joined.
-  //   // --------------------------------------------------
-
-  //   final membershipResponse =
-  //       await supabase
-  //           .from('Family_Members')
-  //           .select('family_id')
-  //           .eq(
-  //             'user_id',
-  //             user.id,
-  //           )
-  //           .eq(
-  //             'status',
-  //             'approved',
-  //           );
-
-  //   final memberships =
-  //       List<Map<String, dynamic>>.from(
-  //     membershipResponse,
-  //   );
-
-  //   // Use a Set so the same family cannot
-  //   // appear twice if the owner also has a
-  //   // Family_Members row.
-  //   final familyIdSet = <String>{};
-
-  //   for (final family
-  //       in ownedFamilies) {
-  //     final familyId =
-  //         family['id']?.toString();
-
-  //     if (familyId != null &&
-  //         familyId.isNotEmpty) {
-  //       familyIdSet.add(
-  //         familyId,
-  //       );
-  //     }
-  //   }
-
-  //   for (final membership
-  //       in memberships) {
-  //     final familyId =
-  //         membership['family_id']
-  //             ?.toString();
-
-  //     if (familyId != null &&
-  //         familyId.isNotEmpty) {
-  //       familyIdSet.add(
-  //         familyId,
-  //       );
-  //     }
-  //   }
-
-  //   final familyIds =
-  //       familyIdSet.toList();
-
-  //   if (familyIds.isEmpty) {
-  //     if (!mounted) return;
-
-  //     setState(() {
-  //       feedItems = [];
-  //       isLoadingFeed = false;
-  //     });
-
-  //     return;
-  //   }
+    final familyIds = <String>[familyId,];
 
     // --------------------------------------------------
     // 3. Load milestones.
@@ -790,6 +723,9 @@ if (postAuthorIds.isNotEmpty) {
     await loadPostCommentCounts();
 
     await scrollToTargetPhoto();
+
+    await scrollToTargetPost();
+
   } catch (e) {
     debugPrint(
       'Unable to load dashboard feed: $e',
@@ -884,6 +820,94 @@ Future<void> scrollToTargetPhoto() async {
         targetPhotoId) {
       setState(() {
         highlightedPhotoId = null;
+      });
+    }
+  });
+}
+
+Future<void> scrollToTargetPost() async {
+  final targetPostId =
+      widget.targetPostId;
+
+  if (targetPostId == null ||
+      targetPostId.isEmpty ||
+      hasScrolledToTargetPost) {
+    return;
+  }
+
+  final targetExists = feedItems.any(
+    (item) =>
+        item['type'] == 'post' &&
+        item['id']?.toString() ==
+            targetPostId,
+  );
+
+  if (!targetExists) {
+    debugPrint(
+      'Target Family Post is not in '
+      'the dashboard feed: $targetPostId',
+    );
+
+    return;
+  }
+
+  hasScrolledToTargetPost = true;
+
+  WidgetsBinding.instance
+      .addPostFrameCallback((_) async {
+    if (!mounted) return;
+
+    final targetKey =
+        postCardKeys[targetPostId];
+
+    final targetContext =
+        targetKey?.currentContext;
+
+    if (targetContext == null) {
+      // The feed may not have finished
+      // building the target card yet.
+      hasScrolledToTargetPost = false;
+
+      await Future.delayed(
+        const Duration(
+          milliseconds: 250,
+        ),
+      );
+
+      if (!mounted) return;
+
+      await scrollToTargetPost();
+
+      return;
+    }
+
+    setState(() {
+      highlightedPostId =
+          targetPostId;
+    });
+
+    await Scrollable.ensureVisible(
+      targetContext,
+      duration: const Duration(
+        milliseconds: 650,
+      ),
+      curve: Curves.easeInOut,
+      alignment: 0.15,
+    );
+
+    await Future.delayed(
+      const Duration(
+        seconds: 2,
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (highlightedPostId ==
+        targetPostId) {
+      setState(() {
+        highlightedPostId =
+            null;
       });
     }
   });
@@ -1826,6 +1850,502 @@ Future<void> createCommentLikeNotification({
   }
 }
 
+Future<void> createFamilyPostCommentNotification({
+  required String postId,
+}) async {
+  final currentUser =
+      supabase.auth.currentUser;
+
+  if (currentUser == null) {
+    return;
+  }
+
+  try {
+    // ------------------------------------------
+    // 1. Get the Family Post.
+    // ------------------------------------------
+
+    final post = await supabase
+        .from('Family_Posts')
+        .select(
+          '''
+          id,
+          family_id,
+          created_by
+          ''',
+        )
+        .eq(
+          'id',
+          postId,
+        )
+        .maybeSingle();
+
+    if (post == null) {
+      return;
+    }
+
+    final recipientUserId =
+        post['created_by']?.toString();
+
+    final familyId =
+        post['family_id']?.toString();
+
+    if (recipientUserId == null ||
+        recipientUserId.isEmpty ||
+        familyId == null ||
+        familyId.isEmpty) {
+      return;
+    }
+
+    // Do not notify someone when they
+    // comment on their own Family Post.
+    if (recipientUserId ==
+        currentUser.id) {
+      return;
+    }
+
+    // ------------------------------------------
+    // 2. Get the commenter's name.
+    // ------------------------------------------
+
+    final profile = await supabase
+        .from('Profiles')
+        .select(
+          '''
+          first_name,
+          last_name
+          ''',
+        )
+        .eq(
+          'user_id',
+          currentUser.id,
+        )
+        .maybeSingle();
+
+    final firstName =
+        profile?['first_name']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final lastName =
+        profile?['last_name']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final actorName = [
+      firstName,
+      lastName,
+    ]
+        .where(
+          (name) => name.isNotEmpty,
+        )
+        .join(' ');
+
+    final displayName =
+        actorName.isEmpty
+            ? 'A family member'
+            : actorName;
+
+    // ------------------------------------------
+    // 3. Create notification.
+    // ------------------------------------------
+
+    await supabase
+        .from('Notifications')
+        .insert({
+      'recipient_user_id':
+          recipientUserId,
+
+      'requested_user_id':
+          currentUser.id,
+
+      'family_id':
+          familyId,
+
+      'type':
+          'family_post_comment',
+
+      'title':
+          'New comment',
+
+      'message':
+          '$displayName commented on your post.',
+
+      'is_read':
+          false,
+
+      'status':
+          'active',
+
+      'reference_type':
+          'family_post',
+
+      'reference_id':
+          postId,
+
+      'action_required':
+          false,
+    });
+  } catch (e) {
+    debugPrint(
+      'Unable to create Family Post '
+      'comment notification: $e',
+    );
+  }
+}
+
+Future<void> createFamilyPostReplyNotification({
+  required String postId,
+  required String parentCommentId,
+}) async {
+  final currentUser =
+      supabase.auth.currentUser;
+
+  if (currentUser == null) {
+    return;
+  }
+
+  try {
+    // ------------------------------------------
+    // 1. Find the exact comment/reply
+    // being replied to.
+    // ------------------------------------------
+
+    final parentComment = await supabase
+        .from('Family_Post_Comments')
+        .select(
+          '''
+          id,
+          user_id,
+          post_id
+          ''',
+        )
+        .eq(
+          'id',
+          parentCommentId,
+        )
+        .maybeSingle();
+
+    if (parentComment == null) {
+      return;
+    }
+
+    final recipientUserId =
+        parentComment['user_id']
+            ?.toString();
+
+    if (recipientUserId == null ||
+        recipientUserId.isEmpty) {
+      return;
+    }
+
+    // Never notify someone when they
+    // reply to their own comment/reply.
+    if (recipientUserId ==
+        currentUser.id) {
+      return;
+    }
+
+    // ------------------------------------------
+    // 2. Get the Family Post so we know
+    // which family this belongs to.
+    // ------------------------------------------
+
+    final post = await supabase
+        .from('Family_Posts')
+        .select(
+          '''
+          id,
+          family_id
+          ''',
+        )
+        .eq(
+          'id',
+          postId,
+        )
+        .maybeSingle();
+
+    if (post == null) {
+      return;
+    }
+
+    final familyId =
+        post['family_id']?.toString();
+
+    if (familyId == null ||
+        familyId.isEmpty) {
+      return;
+    }
+
+    // ------------------------------------------
+    // 3. Get the reply author's name.
+    // ------------------------------------------
+
+    final profile = await supabase
+        .from('Profiles')
+        .select(
+          '''
+          first_name,
+          last_name
+          ''',
+        )
+        .eq(
+          'user_id',
+          currentUser.id,
+        )
+        .maybeSingle();
+
+    final firstName =
+        profile?['first_name']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final lastName =
+        profile?['last_name']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final actorName = [
+      firstName,
+      lastName,
+    ]
+        .where(
+          (name) => name.isNotEmpty,
+        )
+        .join(' ');
+
+    final displayName =
+        actorName.isEmpty
+            ? 'A family member'
+            : actorName;
+
+    // ------------------------------------------
+    // 4. Create notification.
+    // ------------------------------------------
+
+    await supabase
+        .from('Notifications')
+        .insert({
+      'recipient_user_id':
+          recipientUserId,
+
+      'requested_user_id':
+          currentUser.id,
+
+      'family_id':
+          familyId,
+
+      'type':
+          'family_post_reply',
+
+      'title':
+          'New reply',
+
+      'message':
+          '$displayName replied to your comment.',
+
+      'is_read':
+          false,
+
+      'status':
+          'active',
+
+      'reference_type':
+          'family_post',
+
+      'reference_id':
+          postId,
+
+      'action_required':
+          false,
+    });
+  } catch (e) {
+    debugPrint(
+      'Unable to create Family Post '
+      'reply notification: $e',
+    );
+  }
+}
+
+Future<void> createFamilyPostCommentLikeNotification({
+  required String postId,
+  required String commentId,
+}) async {
+  final currentUser =
+      supabase.auth.currentUser;
+
+  if (currentUser == null) {
+    return;
+  }
+
+  try {
+    // ------------------------------------------
+    // 1. Find the exact comment/reply
+    // that received the like.
+    // ------------------------------------------
+
+    final comment = await supabase
+        .from('Family_Post_Comments')
+        .select(
+          '''
+          id,
+          user_id,
+          post_id
+          ''',
+        )
+        .eq(
+          'id',
+          commentId,
+        )
+        .maybeSingle();
+
+    if (comment == null) {
+      return;
+    }
+
+    final recipientUserId =
+        comment['user_id']?.toString();
+
+    if (recipientUserId == null ||
+        recipientUserId.isEmpty) {
+      return;
+    }
+
+    // Never notify somebody that they
+    // liked their own comment/reply.
+    if (recipientUserId ==
+        currentUser.id) {
+      return;
+    }
+
+    // ------------------------------------------
+    // 2. Get the Family Post so we know
+    // which family this belongs to.
+    // ------------------------------------------
+
+    final post = await supabase
+        .from('Family_Posts')
+        .select(
+          '''
+          id,
+          family_id
+          ''',
+        )
+        .eq(
+          'id',
+          postId,
+        )
+        .maybeSingle();
+
+    if (post == null) {
+      return;
+    }
+
+    final familyId =
+        post['family_id']?.toString();
+
+    if (familyId == null ||
+        familyId.isEmpty) {
+      return;
+    }
+
+    // ------------------------------------------
+    // 3. Get the name of the person
+    // who liked the comment.
+    // ------------------------------------------
+
+    final profile = await supabase
+        .from('Profiles')
+        .select(
+          '''
+          first_name,
+          last_name
+          ''',
+        )
+        .eq(
+          'user_id',
+          currentUser.id,
+        )
+        .maybeSingle();
+
+    final firstName =
+        profile?['first_name']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final lastName =
+        profile?['last_name']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final actorName = [
+      firstName,
+      lastName,
+    ]
+        .where(
+          (name) => name.isNotEmpty,
+        )
+        .join(' ');
+
+    final displayName =
+        actorName.isEmpty
+            ? 'A family member'
+            : actorName;
+
+    // ------------------------------------------
+    // 4. Create notification.
+    // ------------------------------------------
+
+    await supabase
+        .from('Notifications')
+        .insert({
+      'recipient_user_id':
+          recipientUserId,
+
+      'requested_user_id':
+          currentUser.id,
+
+      'family_id':
+          familyId,
+
+      'type':
+          'family_post_comment_like',
+
+      'title':
+          'New comment like',
+
+      'message':
+          '$displayName liked your comment.',
+
+      'is_read':
+          false,
+
+      'status':
+          'active',
+
+      'reference_type':
+          'family_post',
+
+      'reference_id':
+          postId,
+
+      'action_required':
+          false,
+    });
+  } catch (e) {
+    debugPrint(
+      'Unable to create Family Post '
+      'comment like notification: $e',
+    );
+  }
+}
+
 Future<void> showFamilyPostComments(
   String postId,
 ) async {
@@ -1955,20 +2475,12 @@ Future<void> showFamilyPostComments(
   }
 }
 
-          Future<void> toggleCommentLike(
-  String commentId,
-) async {
-  if (commentId.isEmpty ||
-      updatingCommentLikeIds.contains(
-        commentId,
-      )) {
-    return;
-  }
+          Future<void> toggleCommentLike(String commentId,) async {
+            if (commentId.isEmpty || updatingCommentLikeIds.contains(commentId,)) {
+                return;
+            }
 
-  final isLiked =
-      likedCommentIds.contains(
-    commentId,
-  );
+            final isLiked = likedCommentIds.contains(commentId,);
 
   try {
     setSheetState(() {
@@ -2000,6 +2512,11 @@ Future<void> showFamilyPostComments(
         'comment_id': commentId,
         'user_id': currentUser.id,
       });
+
+      await createFamilyPostCommentLikeNotification(
+        postId: postId,
+        commentId: commentId,
+      );
     }
 
     await loadCommentLikes();
@@ -2220,6 +2737,8 @@ Future<void> showFamilyPostComments(
                 isPostingComment = true;
               });
 
+              final parentCommentId = replyingToCommentId;
+
               await supabase
                   .from(
                     'Family_Post_Comments',
@@ -2228,9 +2747,24 @@ Future<void> showFamilyPostComments(
                     'post_id': postId,
                     'user_id': currentUser.id,
                     'comment_text': commentText,
-                    'parent_comment_id': replyingToCommentId,
+                    'parent_comment_id': parentCommentId,
                 
                   });
+
+                  if (parentCommentId == null) {
+  // This is a brand-new top-level
+  // comment on the Family Post.
+                    await createFamilyPostCommentNotification(
+                      postId: postId,
+                    );
+                  } else {
+  // This is a reply to a specific
+  // comment OR another reply.
+                    await createFamilyPostReplyNotification(
+                      postId: postId,
+                      parentCommentId: parentCommentId,
+                    );
+                  }
 
               commentController.clear();
 
@@ -4411,6 +4945,12 @@ Widget buildFamilyPostCard(Map<String, dynamic> post,) {
             ?.toString() ??
         '';
 
+  final postCardKey = postCardKeys.putIfAbsent(postId,
+    () => GlobalKey(),
+  );
+
+  final isHighlighted = highlightedPostId == postId;
+
   final isLiked =
     likedPostIds.contains(
       postId,
@@ -4475,50 +5015,38 @@ Widget buildFamilyPostCard(Map<String, dynamic> post,) {
         '${localDate.year}';
   }
 
-  return Container(
-    margin:
-        const EdgeInsets.only(
+  return AnimatedContainer(
+    key: postCardKey,
+    duration: const Duration(milliseconds: 300,),
+    margin: const EdgeInsets.only(
       bottom: 14,
     ),
-    padding:
-        const EdgeInsets.all(
-      16,
-    ),
-    decoration:
-        BoxDecoration(
-      color:
-          FolktriColors.surface,
-      borderRadius:
-          BorderRadius.circular(
-        18,
-      ),
-      border:
-          Border.all(
-        color:
-            FolktriColors
-                .lightLavender,
+    padding: const EdgeInsets.all(16,),
+    decoration: BoxDecoration(
+      color: isHighlighted
+        ? FolktriColors.lightLavender
+          .withValues(alpha: 0.35,)
+        : FolktriColors.surface,
+      borderRadius: BorderRadius.circular(18,),
+      border: Border.all(
+        color: isHighlighted
+          ? FolktriColors.primaryIndigo
+          : FolktriColors.lightLavender,
+        width: isHighlighted ? 2 : 1,
       ),
       boxShadow: [
         BoxShadow(
-          color:
-              FolktriColors
+          color:FolktriColors
                   .midnightIndigo
-                  .withValues(
-                    alpha: 0.035,
-                  ),
+                  .withValues(alpha: 0.035,),
           blurRadius: 12,
-          offset:
-              const Offset(
-            0,
-            4,
-          ),
+          offset: const Offset(0, 4,),
         ),
       ],
     ),
     child:
         Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
@@ -4542,9 +5070,7 @@ Widget buildFamilyPostCard(Map<String, dynamic> post,) {
             Expanded(
               child:
                   Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment
-                        .start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     authorName.isEmpty
@@ -4561,13 +5087,9 @@ Widget buildFamilyPostCard(Map<String, dynamic> post,) {
                       .isNotEmpty)
                     Text(
                       timeText,
-                      style:
-                          const TextStyle(
-                        color:
-                            FolktriColors
-                                .secondaryText,
-                        fontSize:
-                            11,
+                      style: const TextStyle(
+                        color:FolktriColors.secondaryText,
+                        fontSize: 11,
                       ),
                     ),
                 ],
@@ -4576,44 +5098,30 @@ Widget buildFamilyPostCard(Map<String, dynamic> post,) {
           ],
         ),
 
-        const SizedBox(
-          height: 14,
-        ),
+        const SizedBox(height: 14,),
 
         Text(
           postText,
-          style:
-              const TextStyle(
-            color:
-                FolktriColors
-                    .primaryText,
-            fontSize:
-                15,
-            height:
-                1.45,
+          style: const TextStyle(
+            color: FolktriColors.primaryText,
+            fontSize: 15,
+            height: 1.45,
           ),
         ),
 
-        const SizedBox(
-          height: 14,
-        ),
+        const SizedBox(height: 14,),
 
         const Divider(
           height: 1,
-          color:
-              FolktriColors
-                  .lightLavender,
+          color:FolktriColors.lightLavender,
         ),
 
-        const SizedBox(
-          height: 10,
-        ),
+        const SizedBox(height: 10,),
 
         Row(
   children: [
     InkWell(
-      borderRadius:
-          BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(20),
       onTap:
           postId.isEmpty
               ? null
