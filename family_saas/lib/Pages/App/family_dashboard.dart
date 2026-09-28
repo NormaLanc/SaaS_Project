@@ -58,6 +58,8 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
 
   bool isUpdatingPostLike = false;
 
+  Set<String> blockedUserIds = {};
+
   bool isUpdatingLike = false;
 
   Map<String, int> photoCommentCounts = {};
@@ -122,6 +124,10 @@ class _FamilyDashboardState extends State<FamilyDashboard> {
       });
     }
   }
+
+  await loadBlockedUsers();
+
+  if (!mounted) return;
 
   await Future.wait([
     loadFeed(),
@@ -372,11 +378,53 @@ void showFamilyOptions() {
     );
   }
 
+Future<void> loadBlockedUsers() async {
+  final user =
+      supabase.auth.currentUser;
+
+  if (user == null) {
+    blockedUserIds = {};
+    return;
+  }
+
+  try {
+    final response = await supabase
+        .from('User_Blocks')
+        .select('blocked_user_id')
+        .eq(
+          'blocker_user_id',
+          user.id,
+        );
+
+    final rows =
+        List<Map<String, dynamic>>.from(
+      response,
+    );
+
+    blockedUserIds = rows
+        .map(
+          (row) =>
+              row['blocked_user_id']
+                  ?.toString(),
+        )
+        .whereType<String>()
+        .where(
+          (id) => id.isNotEmpty,
+        )
+        .toSet();
+  } catch (e) {
+    debugPrint(
+      'Unable to load blocked users: $e',
+    );
+
+    blockedUserIds = {};
+  }
+}
+
 Future<void> loadFeed() async {
 
    try {
-    final user =
-        supabase.auth.currentUser;
+    final user = supabase.auth.currentUser;
 
     if (user == null) {
       return;
@@ -457,6 +505,7 @@ Future<void> loadFeed() async {
               id,
               family_id,
               child_id,
+              created_by,
               photo_url,
               caption,
               media_type,
@@ -502,22 +551,44 @@ Future<void> loadFeed() async {
               ascending: false,
             );
 
-    final photos =
-        List<Map<String, dynamic>>.from(
-      photoResponse,
-    );
+    final photos = List<Map<String, dynamic>>.from(photoResponse,);
 
-    final milestones =
-        List<Map<String, dynamic>>.from(
-      milestoneResponse,
-    );
+    final visiblePhotos = photos.where(
+      (photo) {
+        final createdBy = photo['created_by']
+          ?.toString();
 
-    final posts =
-        List<Map<String, dynamic>>.from(
-      postResponse,
-    );
+      if (createdBy == null || createdBy.isEmpty) {
+        return true;
+      }
 
-    final postAuthorIds = posts
+      return !blockedUserIds.contains(
+        createdBy,
+      );
+    },
+  ).toList();
+
+    final milestones = List<Map<String, dynamic>>.from(milestoneResponse,);
+
+    final posts = List<Map<String, dynamic>>.from(postResponse,);
+
+    final visiblePosts = posts.where(
+      (post) {
+        final createdBy =
+          post['created_by']
+            ?.toString();
+
+      if (createdBy == null || createdBy.isEmpty) {
+        return true;
+      }
+
+    return !blockedUserIds.contains(
+      createdBy,
+    );
+  },
+).toList();
+
+    final postAuthorIds = visiblePosts
     .map(
       (post) =>
           post['created_by']
@@ -600,13 +671,14 @@ if (postAuthorIds.isNotEmpty) {
         };
       },
     ).toList();
+    
 
     // --------------------------------------------------
     // 7. Convert photos/videos into feed items.
     // --------------------------------------------------
 
     final photoFeed =
-        photos.map(
+        visiblePhotos.map(
       (photo) {
         return <String, dynamic>{
           'type':
@@ -617,6 +689,8 @@ if (postAuthorIds.isNotEmpty) {
               photo['family_id'],
           'child_id':
               photo['child_id'],
+          'created_by':
+              photo['created_by'],
           'photo_url':
               photo['photo_url'],
           'caption':
@@ -632,12 +706,13 @@ if (postAuthorIds.isNotEmpty) {
       },
     ).toList();
 
+
     // --------------------------------------------------
     // 8. Convert text posts into feed items.
     // --------------------------------------------------
 
     final postFeed =
-    posts.map(
+    visiblePosts.map(
   (post) {
     final String? createdBy =
         post['created_by']
@@ -1116,7 +1191,7 @@ Future<void> loadPostCommentCounts() async {
 
     final response = await supabase
         .from('Family_Post_Comments')
-        .select('post_id')
+        .select('post_id, user_id, parent_comment_id')
         .inFilter(
           'post_id',
           postIds,
@@ -1129,17 +1204,68 @@ Future<void> loadPostCommentCounts() async {
 
     final counts = <String, int>{};
 
-    for (final comment in comments) {
-      final postId =
-          comment['post_id']?.toString();
+    final commentsById = <String, Map<String, dynamic>>{};
 
-      if (postId == null ||
-          postId.isEmpty) {
+    for (final comment in comments) {
+      final commentId = comment['id']?.toString();
+
+      if (commentId == null || commentId.isEmpty) {
         continue;
       }
 
-      counts[postId] =
-          (counts[postId] ?? 0) + 1;
+      commentsById[commentId] = comment;
+    }
+
+      bool isCommentVisible(Map<String, dynamic> comment) {
+        final commentUserId =
+          comment['user_id']
+          ?.toString();
+
+  // The comment itself belongs to
+  // somebody the current user blocked.
+      if (commentUserId != null && commentUserId.isNotEmpty &&
+      blockedUserIds.contains(commentUserId,)) {
+        return false;
+      }
+
+      final parentCommentId = comment['parent_comment_id']
+        ?.toString();
+
+  // Top-level visible comment.
+      if (parentCommentId == null || parentCommentId.isEmpty) {
+        return true;
+      }
+
+      final parent = commentsById[parentCommentId];
+
+  // If its parent is unavailable,
+  // this reply cannot appear in the
+  // visible thread.
+      if (parent == null) {
+        return false;
+      }
+
+      return isCommentVisible(
+        parent,
+      );
+    }
+
+for (final comment in comments) {
+  if (!isCommentVisible(comment)) {
+    continue;
+  }
+
+  final postId =
+      comment['post_id']
+          ?.toString();
+
+  if (postId == null ||
+      postId.isEmpty) {
+    continue;
+  }
+
+  counts[postId] =
+      (counts[postId] ?? 0) + 1;
     }
 
     if (!mounted) return;
@@ -1181,7 +1307,7 @@ Future<void> loadPhotoCommentCounts() async {
 
     final response = await supabase
         .from('Photo_Comments')
-        .select('photo_id')
+        .select('photo_id, user_id, parent_comment_id')
         .inFilter(
           'photo_id',
           photoIds,
@@ -1194,18 +1320,68 @@ Future<void> loadPhotoCommentCounts() async {
 
     final counts = <String, int>{};
 
+    final commentsById = <String, Map<String, dynamic>>{};
+
     for (final comment in comments) {
-      final photoId =
-          comment['photo_id']?.toString();
+  final commentId =
+      comment['id']?.toString();
 
-      if (photoId == null ||
-          photoId.isEmpty) {
-        continue;
-      }
+  if (commentId == null ||
+      commentId.isEmpty) {
+    continue;
+  }
 
-      counts[photoId] =
-          (counts[photoId] ?? 0) + 1;
-    }
+  commentsById[commentId] =
+      comment;
+}
+
+bool isCommentVisible(Map<String, dynamic> comment) {
+  final commentUserId =
+      comment['user_id']
+          ?.toString();
+
+  if (commentUserId != null &&
+      commentUserId.isNotEmpty &&
+      blockedUserIds.contains(
+        commentUserId,
+      )) {
+    return false;
+  }
+
+  final parentCommentId =
+      comment['parent_comment_id']
+          ?.toString();
+
+  if (parentCommentId == null || parentCommentId.isEmpty) {
+    return true;
+  }
+
+  final parent = commentsById[parentCommentId];
+
+  if (parent == null) {
+    return false;
+  }
+
+  return isCommentVisible(parent,);
+}
+
+for (final comment in comments) {
+  if (!isCommentVisible(comment)) {
+    continue;
+  }
+
+  final photoId =
+      comment['photo_id']
+          ?.toString();
+
+  if (photoId == null ||
+      photoId.isEmpty) {
+    continue;
+  }
+
+  counts[photoId] =
+      (counts[photoId] ?? 0) + 1;
+}
 
     if (!mounted) return;
 
@@ -2581,8 +2757,23 @@ Future<void> showFamilyPostComments(
                 response,
               );
 
+              final visibleComments = loadedComments.where(
+                (comment) {
+                final commentUserId = comment['user_id']
+                  ?.toString();
+
+                if (commentUserId == null || commentUserId.isEmpty) {
+                  return true;
+                }
+
+                return !blockedUserIds.contains(
+                  commentUserId,
+                );
+              },
+            ).toList();
+
               final userIds =
-                  loadedComments
+                  visibleComments
                       .map(
                         (comment) =>
                             comment[
@@ -2678,7 +2869,7 @@ Future<void> showFamilyPostComments(
               }
 
               for (final comment
-                  in loadedComments) {
+                  in visibleComments) {
                 final userId =
                     comment['user_id']
                         ?.toString();
@@ -2696,7 +2887,7 @@ Future<void> showFamilyPostComments(
 
               setSheetState(() {
                 comments =
-                    loadedComments;
+                    visibleComments;
 
                 isLoadingComments =
                     false;
@@ -3759,7 +3950,25 @@ Future<void> showPhotoComments(String photoId) async {
               final loadedComments = List<Map<String, dynamic>>
                       .from(response,);
 
-              final userIds = loadedComments.map(
+              final visibleComments =
+                loadedComments.where(
+                  (comment) {
+              final commentUserId =
+                comment['user_id']
+                ?.toString();
+
+              if (commentUserId == null || commentUserId.isEmpty) {
+                return true;
+              }
+
+              return !blockedUserIds.contains(
+                commentUserId,
+              );
+            },
+          ).toList();
+
+
+              final userIds = visibleComments.map(
                         (comment) => comment['user_id']?.toString(),
                       )
                       .whereType<String>()
@@ -3827,7 +4036,7 @@ Future<void> showPhotoComments(String photoId) async {
               }
 
               for (final comment
-                  in loadedComments) {
+                  in visibleComments) {
                 final userId =
                     comment['user_id']
                         ?.toString();
@@ -3844,7 +4053,7 @@ Future<void> showPhotoComments(String photoId) async {
               }
 
               setSheetState(() {
-                comments = loadedComments;
+                comments = visibleComments;
 
                 isLoadingComments = false;
               });
@@ -4938,12 +5147,583 @@ Widget buildFeedItem(
   return const SizedBox.shrink();
 }
 
+Future<bool> blockUser({
+  required String blockedUserId,
+}) async {
+  final currentUser =
+      supabase.auth.currentUser;
+
+  if (currentUser == null ||
+      blockedUserId.isEmpty ||
+      blockedUserId == currentUser.id) {
+    return false;
+  }
+
+  try {
+    await supabase
+        .from('User_Blocks')
+        .insert({
+      'blocker_user_id':
+          currentUser.id,
+      'blocked_user_id':
+          blockedUserId,
+    });
+
+    return true;
+  } catch (e) {
+    debugPrint(
+      'Unable to block user: $e',
+    );
+
+    if (!mounted) {
+      return false;
+    }
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Unable to block this person. Please try again.',
+        ),
+      ),
+    );
+
+    return false;
+  }
+}
+
+Future<void> confirmBlockUser({
+  required String blockedUserId,
+  required String displayName,
+}) async {
+  final shouldBlock =
+      await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        backgroundColor:
+            FolktriColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.circular(20),
+        ),
+        title: const Row(
+          children: [
+            Icon(
+              Icons.block_rounded,
+              color:
+                  FolktriColors.dustyRose,
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Block this person?',
+                style: TextStyle(
+                  color:
+                      FolktriColors.primaryText,
+                  fontWeight:
+                      FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          displayName.isEmpty
+              ? 'You will no longer see this person’s social activity in Folktri.'
+              : 'You will no longer see $displayName’s social activity in Folktri.',
+          style: const TextStyle(
+            color:
+                FolktriColors.secondaryText,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(
+                dialogContext,
+              ).pop(false);
+            },
+            child: const Text(
+              'Cancel',
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(
+                dialogContext,
+              ).pop(true);
+            },
+            style:
+                ElevatedButton.styleFrom(
+              backgroundColor:
+                  FolktriColors.dustyRose,
+              foregroundColor:
+                  Colors.white,
+            ),
+            child: const Text(
+              'Block',
+            ),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (shouldBlock != true ||
+      !mounted) {
+    return;
+  }
+
+  final blocked =
+      await blockUser(
+    blockedUserId:
+        blockedUserId,
+  );
+
+  if (!blocked || !mounted) {
+    return;
+  }
+
+  await loadBlockedUsers();
+
+  if (!mounted) return;
+
+  await loadFeed();
+
+  if (!mounted) return;
+
+  ScaffoldMessenger.of(context)
+      .showSnackBar(
+    SnackBar(
+      content: Text(
+        displayName.isEmpty
+            ? 'This person has been blocked.'
+            : '$displayName has been blocked.',
+      ),
+    ),
+  );
+}
+
+Future<void> showFamilyPostReportDialog({
+  required Map<String, dynamic> post,
+}) async {
+  final user = supabase.auth.currentUser;
+
+  if (user == null) return;
+
+  final postId =
+      post['id']?.toString() ?? '';
+
+  final familyId =
+      post['family_id']?.toString() ?? '';
+
+  final reportedUserId =
+      post['created_by']?.toString() ?? '';
+
+  if (postId.isEmpty ||
+      familyId.isEmpty ||
+      reportedUserId.isEmpty) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Unable to report this post.',
+        ),
+      ),
+    );
+
+    return;
+  }
+
+  String? selectedReason;
+
+  final detailsController =
+      TextEditingController();
+
+  bool isSubmitting = false;
+
+  final submitted =
+      await showDialog<bool>(
+    context: context,
+    barrierDismissible: !isSubmitting,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (
+          context,
+          setDialogState,
+        ) {
+          Future<void> submitReport() async {
+            if (selectedReason == null ||
+                isSubmitting) {
+              return;
+            }
+
+            setDialogState(() {
+              isSubmitting = true;
+            });
+
+            try {
+              await supabase
+                  .from('Content_Reports')
+                  .insert({
+                'reporter_user_id':
+                    user.id,
+                'reported_user_id':
+                    reportedUserId,
+                'family_id':
+                    familyId,
+                'content_type':
+                    'family_post',
+                'content_id':
+                    postId,
+                'reason':
+                    selectedReason,
+                'details':
+                    detailsController.text
+                            .trim()
+                            .isEmpty
+                        ? null
+                        : detailsController.text
+                            .trim(),
+              });
+
+              if (!dialogContext.mounted) {
+                return;
+              }
+
+              Navigator.of(dialogContext)
+                  .pop(true);
+            } catch (e) {
+              debugPrint(
+                'Unable to submit Family Post report: $e',
+              );
+
+              if (!dialogContext.mounted) {
+                return;
+              }
+
+              setDialogState(() {
+                isSubmitting = false;
+              });
+
+              ScaffoldMessenger.of(
+                dialogContext,
+              ).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Unable to submit report. Please try again.',
+                  ),
+                ),
+              );
+            }
+          }
+
+          return AlertDialog(
+            backgroundColor:
+                FolktriColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius:
+                  BorderRadius.circular(20),
+            ),
+            title: const Row(
+              children: [
+                Icon(
+                  Icons.flag_outlined,
+                  color:
+                      FolktriColors.primaryIndigo,
+                ),
+                SizedBox(width: 10),
+                Text(
+                  'Report post',
+                  style: TextStyle(
+                    color:
+                        FolktriColors.primaryText,
+                    fontWeight:
+                        FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize:
+                    MainAxisSize.min,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Why are you reporting this post?',
+                    style: TextStyle(
+                      color:
+                          FolktriColors.primaryText,
+                      fontWeight:
+                          FontWeight.w600,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  buildReportReasonOption(
+                    title:
+                        'Inappropriate content',
+                    value:
+                        'inappropriate_content',
+                    selectedValue:
+                        selectedReason,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedReason =
+                            value;
+                      });
+                    },
+                  ),
+
+                  buildReportReasonOption(
+                    title:
+                        'Harassment or bullying',
+                    value:
+                        'harassment_bullying',
+                    selectedValue:
+                        selectedReason,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedReason =
+                            value;
+                      });
+                    },
+                  ),
+
+                  buildReportReasonOption(
+                    title:
+                        'Sexual content',
+                    value:
+                        'sexual_content',
+                    selectedValue:
+                        selectedReason,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedReason =
+                            value;
+                      });
+                    },
+                  ),
+
+                  buildReportReasonOption(
+                    title:
+                        "Content involving a child's safety",
+                    value:
+                        'child_safety',
+                    selectedValue:
+                        selectedReason,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedReason =
+                            value;
+                      });
+                    },
+                  ),
+
+                  buildReportReasonOption(
+                    title: 'Spam',
+                    value: 'spam',
+                    selectedValue:
+                        selectedReason,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedReason =
+                            value;
+                      });
+                    },
+                  ),
+
+                  buildReportReasonOption(
+                    title:
+                        'Impersonation',
+                    value:
+                        'impersonation',
+                    selectedValue:
+                        selectedReason,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedReason =
+                            value;
+                      });
+                    },
+                  ),
+
+                  buildReportReasonOption(
+                    title:
+                        'Something else',
+                    value: 'other',
+                    selectedValue:
+                        selectedReason,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedReason =
+                            value;
+                      });
+                    },
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  TextField(
+                    controller:
+                        detailsController,
+                    maxLines: 3,
+                    maxLength: 2000,
+                    decoration:
+                        InputDecoration(
+                      labelText:
+                          'Additional details (optional)',
+                      alignLabelWithHint:
+                          true,
+                      filled: true,
+                      fillColor:
+                          FolktriColors.background,
+                      border:
+                          OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(
+                          14,
+                        ),
+                      ),
+                      enabledBorder:
+                          OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(
+                          14,
+                        ),
+                        borderSide:
+                            const BorderSide(
+                          color: FolktriColors
+                              .lightLavender,
+                        ),
+                      ),
+                      focusedBorder:
+                          OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(
+                          14,
+                        ),
+                        borderSide:
+                            const BorderSide(
+                          color: FolktriColors
+                              .primaryIndigo,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () {
+                        Navigator.of(
+                          dialogContext,
+                        ).pop(false);
+                      },
+                child: const Text(
+                  'Cancel',
+                ),
+              ),
+
+              ElevatedButton(
+                onPressed:
+                    selectedReason == null ||
+                            isSubmitting
+                        ? null
+                        : submitReport,
+                style:
+                    ElevatedButton.styleFrom(
+                  backgroundColor:
+                      FolktriColors
+                          .primaryIndigo,
+                  foregroundColor:
+                      Colors.white,
+                ),
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child:
+                            CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Submit report',
+                      ),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+
+  //detailsController.dispose();
+
+  if (submitted == true && mounted) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Report received. Thank you for helping keep Folktri safe.',
+        ),
+      ),
+    );
+  }
+}
+
+Widget buildReportReasonOption({
+  required String title,
+  required String value,
+  required String? selectedValue,
+  required ValueChanged<String?> onChanged,
+}) {
+  return RadioListTile<String>(
+    value: value,
+    groupValue: selectedValue,
+    onChanged: onChanged,
+    contentPadding: EdgeInsets.zero,
+    dense: true,
+    activeColor:
+        FolktriColors.primaryIndigo,
+    title: Text(
+      title,
+      style: const TextStyle(
+        color: FolktriColors.primaryText,
+        fontSize: 14,
+      ),
+    ),
+  );
+}
+
 Widget buildFamilyPostCard(Map<String, dynamic> post,) {
 
   final postId =
     post['id']
             ?.toString() ??
         '';
+
+  final currentUserId = supabase.auth.currentUser?.id;
+
+  final postAuthorUserId =
+    post['created_by']
+        ?.toString();
+
+  final isOwnPost =
+    currentUserId != null &&
+    postAuthorUserId != null &&
+    currentUserId ==
+        postAuthorUserId;
 
   final postCardKey = postCardKeys.putIfAbsent(postId,
     () => GlobalKey(),
@@ -5095,6 +5875,87 @@ Widget buildFamilyPostCard(Map<String, dynamic> post,) {
                 ],
               ),
             ),
+
+            if(!isOwnPost)
+              PopupMenuButton<String>(
+                tooltip: 'Post options',
+                icon: const Icon(
+                  Icons.more_horiz_rounded,
+                  color: FolktriColors.secondaryText,
+                  size: 22,
+                ),
+                color: FolktriColors.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14,),
+                ),
+                onSelected: (value) {
+                  // We will connect these actions
+                  // in the next step.
+                  if (value == 'report') {
+                    showFamilyPostReportDialog(post: post,);
+                  }
+
+                  if (value == 'block') {
+                    final blockedUserId = postAuthorUserId ?? '';
+
+                    if (blockedUserId.isEmpty) {
+                      return;
+                    }
+
+                    confirmBlockUser(
+                      blockedUserId: blockedUserId,
+                      displayName: authorName.isEmpty
+                        ? 'this person'
+                        : authorName,
+                    );
+                  }
+                },
+  itemBuilder: (context) => [
+    const PopupMenuItem<String>(
+      value: 'report',
+      child: Row(
+        children: [
+          Icon(
+            Icons.flag_outlined,
+            size: 19,
+            color:
+                FolktriColors.secondaryText,
+          ),
+          SizedBox(width: 10),
+          Text(
+            'Report',
+            style: TextStyle(
+              color:
+                  FolktriColors.primaryText,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    ),
+    const PopupMenuItem<String>(
+      value: 'block',
+      child: Row(
+        children: [
+          Icon(
+            Icons.block_rounded,
+            size: 19,
+            color: FolktriColors.dustyRose,
+          ),
+          SizedBox(width: 10),
+          Text(
+            'Block this person',
+            style: TextStyle(
+              color:
+                  FolktriColors.primaryText,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    ),
+  ],
+),
           ],
         ),
 

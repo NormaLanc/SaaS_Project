@@ -1416,6 +1416,24 @@ Future<void> confirmPermanentDeletion() async {
 
             const SizedBox(height: 26),
 
+            // PRIVACY & SAFETY
+            buildSectionTitle('PRIVACY & SAFETY',),
+
+            buildSettingsCard(
+              children: [
+                buildSettingsTile(
+                  icon: Icons.shield_outlined,
+                  title: 'Privacy & Safety',
+                  subtitle: 'Manage blocked people and safety settings',
+                  onTap: () {
+                    context.push('/settings/privacy',);
+                  },
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 26),
+
             // SUPPORT
             buildSectionTitle('SUPPORT'),
 

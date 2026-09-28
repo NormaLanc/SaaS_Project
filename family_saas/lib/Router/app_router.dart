@@ -30,6 +30,7 @@ import '../Pages/App/Settings/family_access.dart';
 import '../Pages/App/Settings/notification_settings.dart';
 import '../Pages/App/Settings/support.dart';
 import '../Pages/App/Settings/member_permissions.dart';
+import '../Pages/App/Settings/privacy.dart';
 
 final GoRouter appRouter = GoRouter(
   // initialLocation: kIsWeb ? '/' : '/welcome',
@@ -296,7 +297,11 @@ GoRoute(
   builder: (context, state) =>
       const NotificationSettingsPage(),
 ),
-
+GoRoute(
+  path: '/settings/privacy',
+  builder: (context, state) =>
+      const PrivacyPage(),
+),
 GoRoute(
   path: '/settings/support',
   builder: (context, state) =>
