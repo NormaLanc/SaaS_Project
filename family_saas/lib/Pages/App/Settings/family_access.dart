@@ -500,7 +500,7 @@ String getMemberInitials(
         boxShadow: [
           BoxShadow(
             color: FolktriColors.midnightIndigo
-                .withOpacity(0.05),
+                .withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 5),
           ),
@@ -701,7 +701,7 @@ String getMemberInitials(
         title,
         style: TextStyle(
           color: FolktriColors.midnightIndigo
-              .withOpacity(0.62),
+              .withValues(alpha: 0.62),
           fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.6,

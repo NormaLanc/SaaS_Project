@@ -257,7 +257,7 @@ class _ModerationReportsPageState
         boxShadow: [
           BoxShadow(
             color: FolktriColors.midnightIndigo
-                .withOpacity(0.05),
+                .withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 5),
           ),
@@ -277,7 +277,7 @@ class _ModerationReportsPageState
                 decoration: BoxDecoration(
                   color: FolktriColors
                       .lightLavender
-                      .withOpacity(0.65),
+                      .withValues(alpha: 0.65),
                   borderRadius:
                       BorderRadius.circular(14),
                 ),
@@ -331,7 +331,7 @@ class _ModerationReportsPageState
                 ),
                 decoration: BoxDecoration(
                   color: statusColor(status)
-                      .withOpacity(0.12),
+                      .withValues(alpha: 0.12),
                   borderRadius:
                       BorderRadius.circular(20),
                 ),
@@ -368,7 +368,7 @@ class _ModerationReportsPageState
             'Report ID: ${report['id']}',
             style: TextStyle(
               color: FolktriColors.secondaryText
-                  .withOpacity(0.75),
+                  .withValues(alpha: 0.75),
               fontSize: 10.5,
             ),
           ),

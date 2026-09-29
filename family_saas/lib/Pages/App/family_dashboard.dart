@@ -2578,7 +2578,7 @@ Future<void> showCommentReportDialog({
                   const SizedBox(height: 12),
 
                   DropdownButtonFormField<String>(
-                    value: selectedReason,
+                    initialValue: selectedReason,
                     isExpanded: true,
                     decoration: InputDecoration(
                       filled: true,
@@ -4585,7 +4585,7 @@ Future<void> showPhotoCommentReportDialog({
                   const SizedBox(height: 12),
 
                   DropdownButtonFormField<String>(
-                    value: selectedReason,
+                    initialValue: selectedReason,
                     isExpanded: true,
                     decoration: InputDecoration(
                       filled: true,

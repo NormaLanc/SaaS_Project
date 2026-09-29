@@ -394,7 +394,7 @@ class _FamilyPageState extends State<FamilyPage> {
             boxShadow: [
               BoxShadow(
                 color: Colors.black
-                    .withOpacity(0.06),
+                    .withValues(alpha: 0.06),
                 blurRadius: 15,
                 offset:
                     const Offset(0, 5),
@@ -1022,7 +1022,7 @@ Widget buildUpcomingFamilyEventCard(
       boxShadow: [
         BoxShadow(
           color: Colors.black
-              .withOpacity(0.04),
+              .withValues(alpha: 0.04),
           blurRadius: 12,
           offset:
               const Offset(0, 4),
@@ -1037,7 +1037,7 @@ Widget buildUpcomingFamilyEventCard(
           decoration: BoxDecoration(
             color: FolktriColors
                 .lightLavender
-                .withOpacity(0.65),
+                .withValues(alpha: 0.65),
             shape: BoxShape.circle,
           ),
           child: const Icon(
@@ -1275,7 +1275,7 @@ Widget buildActivityCard(Map<String, dynamic> item,) {
       boxShadow: [
         BoxShadow(
           color: Colors.black
-              .withOpacity(0.04),
+              .withValues(alpha: 0.04),
           blurRadius: 12,
           offset:
               const Offset(0, 4),
@@ -1289,7 +1289,7 @@ Widget buildActivityCard(Map<String, dynamic> item,) {
           height: 42,
           decoration: BoxDecoration(
             color:
-                color.withOpacity(0.12),
+                color.withValues(alpha: 0.12),
             shape: BoxShape.circle,
           ),
           child: Icon(

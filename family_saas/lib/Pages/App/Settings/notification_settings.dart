@@ -553,7 +553,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
         style: TextStyle(
           color: FolktriColors
               .midnightIndigo
-              .withOpacity(0.62),
+              .withValues(alpha: 0.62),
           fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.6,
@@ -574,7 +574,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
           BoxShadow(
             color: FolktriColors
                 .midnightIndigo
-                .withOpacity(0.04),
+                .withValues(alpha: 0.04),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -596,7 +596,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     return SwitchListTile(
       value: value,
       onChanged: onChanged,
-      activeColor:
+      activeThumbColor:
           FolktriColors.primaryIndigo,
 
       secondary: Container(

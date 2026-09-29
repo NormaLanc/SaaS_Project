@@ -580,7 +580,7 @@ Future<void> loadBlockedUsers() async {
           color: isSelected
               ? FolktriColors.primaryIndigo
               : FolktriColors.lightLavender
-                  .withOpacity(0.55),
+                  .withValues(alpha: 0.55),
 
           borderRadius:
               BorderRadius.circular(22),
@@ -888,7 +888,7 @@ Future<void> loadBlockedUsers() async {
     decoration: BoxDecoration(
       color: isFamily
           ? FolktriColors.connectionTeal
-              .withOpacity(0.10)
+              .withValues(alpha: 0.10)
           : FolktriColors.lightLavender,
 
       borderRadius:
@@ -1067,8 +1067,8 @@ Future<void> loadBlockedUsers() async {
                     boxShadow: [
                       BoxShadow(
                         color: color
-                            .withOpacity(
-                          0.25,
+                            .withValues(
+                          alpha: 0.25,
                         ),
 
                         blurRadius: 6,
@@ -1128,8 +1128,8 @@ Future<void> loadBlockedUsers() async {
                   BoxShadow(
                     color:
                         Colors.black
-                            .withOpacity(
-                      0.04,
+                            .withValues(
+                      alpha: 0.04,
                     ),
 
                     blurRadius: 12,
@@ -1155,8 +1155,8 @@ Future<void> loadBlockedUsers() async {
                     decoration:
                         BoxDecoration(
                       color: color
-                          .withOpacity(
-                        0.12,
+                          .withValues(
+                        alpha: 0.12,
                       ),
 
                       shape:
@@ -1729,12 +1729,12 @@ Widget buildTimelineHeader() {
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
                 colors: [
-                  timelineBackground.withOpacity(0.00),
-                  timelineBackground.withOpacity(0.12),
-                  timelineBackground.withOpacity(0.28),
-                  timelineBackground.withOpacity(0.28),
-                  timelineBackground.withOpacity(0.12),
-                  timelineBackground.withOpacity(0.00),
+                  timelineBackground.withValues(alpha: 0.00),
+                  timelineBackground.withValues(alpha: 0.12),
+                  timelineBackground.withValues(alpha: 0.28),
+                  timelineBackground.withValues(alpha: 0.28),
+                  timelineBackground.withValues(alpha: 0.12),
+                  timelineBackground.withValues(alpha: 0.00),
                 ],
                 stops: const [
                   0.0,

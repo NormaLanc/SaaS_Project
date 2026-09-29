@@ -383,7 +383,7 @@ class _ChangePasswordPageState
                     disabledBackgroundColor:
                         FolktriColors
                             .primaryIndigo
-                            .withOpacity(0.55),
+                            .withValues(alpha: 0.55),
                     elevation: 0,
                     shape:
                         RoundedRectangleBorder(
@@ -476,7 +476,7 @@ class _ChangePasswordPageState
           borderSide: BorderSide(
             color: FolktriColors
                 .lightLavender
-                .withOpacity(0.7),
+                .withValues(alpha: 0.7),
           ),
         ),
 

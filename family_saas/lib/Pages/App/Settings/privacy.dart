@@ -477,8 +477,8 @@ class _PrivacyPageState
           BoxShadow(
             color: FolktriColors
                 .midnightIndigo
-                .withOpacity(
-              0.04,
+                .withValues(
+              alpha: 0.04,
             ),
             blurRadius: 12,
             offset:

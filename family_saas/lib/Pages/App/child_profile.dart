@@ -1189,7 +1189,7 @@ Widget _buildEmptyEventsCard({
       boxShadow: [
         BoxShadow(
           color:
-              Colors.black.withOpacity(0.04),
+              Colors.black.withValues(alpha: 0.04),
           blurRadius: 12,
           offset:
               const Offset(0, 4),
@@ -1286,7 +1286,7 @@ Widget _buildChildEventCard(
       boxShadow: [
         BoxShadow(
           color:
-              Colors.black.withOpacity(0.05),
+              Colors.black.withValues(alpha: 0.05),
           blurRadius: 14,
           offset:
               const Offset(0, 5),
@@ -1378,7 +1378,7 @@ Widget _buildChildEventCard(
               height: 42,
               decoration: BoxDecoration(
                 color:
-                    color.withOpacity(0.12),
+                    color.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -1567,8 +1567,8 @@ Widget buildChildProfileHeader() {
             boxShadow: [
               BoxShadow(
                 color:
-                    Colors.black.withOpacity(
-                  0.08,
+                    Colors.black.withValues(
+                  alpha: 0.08,
                 ),
                 blurRadius: 16,
                 offset:
@@ -1739,7 +1739,7 @@ Widget _buildProfileStat({
       boxShadow: [
         BoxShadow(
           color:
-              Colors.black.withOpacity(0.04),
+              Colors.black.withValues(alpha: 0.04),
           blurRadius: 10,
           offset:
               const Offset(0, 3),

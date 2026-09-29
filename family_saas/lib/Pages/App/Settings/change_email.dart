@@ -445,7 +445,7 @@ class _ChangeEmailPageState
                     disabledBackgroundColor:
                         FolktriColors
                             .primaryIndigo
-                            .withOpacity(0.55),
+                            .withValues(alpha: 0.55),
                     elevation: 0,
                     shape:
                         RoundedRectangleBorder(

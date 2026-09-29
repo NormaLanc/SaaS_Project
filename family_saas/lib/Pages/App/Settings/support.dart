@@ -310,7 +310,7 @@ Account email: ${userEmail.isNotEmpty ? userEmail : 'Not available'}
           BoxShadow(
             color: FolktriColors
                 .midnightIndigo
-                .withOpacity(0.04),
+                .withValues(alpha: 0.04),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -384,7 +384,7 @@ Account email: ${userEmail.isNotEmpty ? userEmail : 'Not available'}
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: FolktriColors.lightLavender
-            .withOpacity(0.45),
+            .withValues(alpha: 0.45),
         borderRadius:
             BorderRadius.circular(16),
       ),
@@ -492,7 +492,7 @@ Account email: ${userEmail.isNotEmpty ? userEmail : 'Not available'}
         style: TextStyle(
           color: FolktriColors
               .midnightIndigo
-              .withOpacity(0.62),
+              .withValues(alpha: 0.62),
           fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.6,

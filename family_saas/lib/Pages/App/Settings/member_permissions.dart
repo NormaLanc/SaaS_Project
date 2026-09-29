@@ -764,7 +764,7 @@ String get memberInitials {
         title,
         style: TextStyle(
           color: FolktriColors.midnightIndigo
-              .withOpacity(0.62),
+              .withValues(alpha: 0.62),
           fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.6,
@@ -783,7 +783,7 @@ String get memberInitials {
         boxShadow: [
           BoxShadow(
             color: FolktriColors.midnightIndigo
-                .withOpacity(0.04),
+                .withValues(alpha: 0.04),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -804,7 +804,7 @@ String get memberInitials {
       value: value,
       onChanged: onChanged,
 
-      activeColor:
+      activeThumbColor:
           FolktriColors.primaryIndigo,
 
       secondary: Container(

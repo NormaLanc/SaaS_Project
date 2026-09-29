@@ -737,8 +737,8 @@ Future<void> checkAdminStatus() async {
                           decoration:
                               BoxDecoration(
                             color: Colors.red
-                                .withOpacity(
-                              0.06,
+                                .withValues(
+                              alpha: 0.06,
                             ),
                             borderRadius:
                                 BorderRadius
@@ -880,7 +880,7 @@ Future<void> chooseSharedPhotoDeletion() async {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: FolktriColors.lightLavender
-                          .withOpacity(0.45),
+                          .withValues(alpha: 0.45),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Text(
@@ -1168,7 +1168,7 @@ Future<void> confirmPermanentDeletion() async {
         style: TextStyle(
           color: FolktriColors
               .midnightIndigo
-              .withOpacity(0.65),
+              .withValues(alpha: 0.65),
           fontSize: 12,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.7,
@@ -1189,7 +1189,7 @@ Future<void> confirmPermanentDeletion() async {
           BoxShadow(
             color: FolktriColors
                 .midnightIndigo
-                .withOpacity(0.05),
+                .withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 5),
           ),
@@ -1234,10 +1234,10 @@ Future<void> confirmPermanentDeletion() async {
                 decoration: BoxDecoration(
                   color: isDestructive
                       ? Colors.red
-                          .withOpacity(0.08)
+                          .withValues(alpha: 0.08)
                       : FolktriColors
                           .lightLavender
-                          .withOpacity(0.65),
+                          .withValues(alpha: 0.65),
                   borderRadius:
                       BorderRadius.circular(15),
                 ),
@@ -1302,7 +1302,7 @@ Future<void> confirmPermanentDeletion() async {
                       ? Colors.red.shade300
                       : FolktriColors
                           .secondaryText
-                          .withOpacity(0.55),
+                          .withValues(alpha: 0.55),
                 ),
             ],
           ),
@@ -1321,7 +1321,7 @@ Future<void> confirmPermanentDeletion() async {
         thickness: 1,
         color: FolktriColors
             .lightLavender
-            .withOpacity(0.55),
+            .withValues(alpha: 0.55),
       ),
     );
   }

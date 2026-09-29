@@ -1811,7 +1811,7 @@ class _ModerationReportDetailsPageState
             boxShadow: [
               BoxShadow(
                 color: FolktriColors.midnightIndigo
-                    .withOpacity(0.05),
+                    .withValues(alpha: 0.05),
                 blurRadius: 16,
                 offset: const Offset(0, 5),
               ),
@@ -1927,7 +1927,7 @@ class _ModerationReportDetailsPageState
               decoration: BoxDecoration(
                 color: FolktriColors
                     .lightLavender
-                    .withOpacity(0.65),
+                    .withValues(alpha: 0.65),
                 borderRadius:
                     BorderRadius.circular(12),
               ),
@@ -2050,7 +2050,7 @@ class _ModerationReportDetailsPageState
             decoration: BoxDecoration(
               color: FolktriColors
                   .lightLavender
-                  .withOpacity(0.65),
+                  .withValues(alpha: 0.65),
               borderRadius:
                   BorderRadius.circular(12),
             ),
@@ -2188,7 +2188,7 @@ if (contentType == 'photo_comment') {
             decoration: BoxDecoration(
               color: FolktriColors
                   .lightLavender
-                  .withOpacity(0.65),
+                  .withValues(alpha: 0.65),
               borderRadius:
                   BorderRadius.circular(12),
             ),
@@ -2340,7 +2340,7 @@ if (contentType == 'photo') {
             decoration: BoxDecoration(
               color: FolktriColors
                   .lightLavender
-                  .withOpacity(0.65),
+                  .withValues(alpha: 0.65),
               borderRadius:
                   BorderRadius.circular(12),
             ),
