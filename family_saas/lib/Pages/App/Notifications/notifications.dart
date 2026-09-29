@@ -16,6 +16,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   List<Map<String, dynamic>> notifications = [];
 
+  Set<String> blockedUserIds = {};
+
   bool isLoading = true;
   String? errorMessage;
 
@@ -30,63 +32,193 @@ class _NotificationsPageState extends State<NotificationsPage> {
     loadNotifications();
   }
 
+  Future<void> loadBlockedUsers() async {
+  final user = supabase.auth.currentUser;
+
+  if (user == null) {
+    blockedUserIds = {};
+    return;
+  }
+
+  try {
+    final data = await supabase
+        .from('User_Blocks')
+        .select('blocked_user_id')
+        .eq(
+          'blocker_user_id',
+          user.id,
+        );
+
+    blockedUserIds =
+        List<Map<String, dynamic>>.from(
+      data,
+    )
+            .map(
+              (block) =>
+                  block['blocked_user_id']
+                      ?.toString(),
+            )
+            .whereType<String>()
+            .where(
+              (id) => id.isNotEmpty,
+            )
+            .toSet();
+  } catch (e) {
+    debugPrint(
+      'LOAD NOTIFICATION BLOCKS ERROR: $e',
+    );
+
+    blockedUserIds = {};
+  }
+}
+
   Future<void> loadNotifications() async {
+  final user = supabase.auth.currentUser;
 
-    final user = supabase.auth.currentUser;
-
-    if (user == null) {
+  if (user == null) {
+    if (mounted) {
       setState(() {
         notifications = [];
         isLoading = false;
       });
-
-      return;
     }
 
-    if (mounted) {
-      setState(() {
-        isLoading = true;
-        errorMessage = null;
-      });
-    }
-
-    try {
-      final data = await supabase
-          .from('Notifications')
-          .select()
-          .eq(
-            'recipient_user_id',
-            user.id,
-          )
-          .order(
-            'created_at',
-            ascending: false,
-          );
-
-      if (!mounted) return;
-
-      setState(() {
-        notifications = List<Map<String, dynamic>>.from(data);
-
-        isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('LOAD NOTIFICATIONS ERROR: $e');
-
-      if (!mounted) return;
-
-      setState(() {
-        isLoading = false;
-      });
-
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text('Unable to load notifications: $e',),
-        ),
-      );
-    }
+    return;
   }
+
+  if (mounted) {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+  }
+
+  try {
+    // ------------------------------------------
+    // LOAD NOTIFICATIONS FIRST
+    // ------------------------------------------
+
+    final data = await supabase
+        .from('Notifications')
+        .select()
+        .eq(
+          'recipient_user_id',
+          user.id,
+        )
+        .order(
+          'created_at',
+          ascending: false,
+        );
+
+    final loadedNotifications =
+        List<Map<String, dynamic>>.from(
+      data,
+    );
+
+    // ------------------------------------------
+    // LOAD BLOCKED USERS SEPARATELY
+    // ------------------------------------------
+
+    await loadBlockedUsers();
+
+    if (!mounted) return;
+
+    // ------------------------------------------
+    // FILTER SOCIAL NOTIFICATIONS
+    // ------------------------------------------
+
+    final visibleNotifications =
+        loadedNotifications.where(
+      (notification) {
+        final requestedUserId =
+            notification['requested_user_id']
+                ?.toString();
+
+        final referenceType =
+            notification['reference_type']
+                ?.toString();
+
+        final isSocialNotification =
+            referenceType == 'family_post' ||
+            referenceType == 'photo';
+
+        // Keep non-social notifications,
+        // including family join requests.
+        if (!isSocialNotification) {
+          return true;
+        }
+
+        // If there is no actor stored,
+        // do not hide the notification.
+        if (requestedUserId == null ||
+            requestedUserId.isEmpty) {
+          return true;
+        }
+
+        // Hide social notifications created
+        // by someone this user has blocked.
+        return !blockedUserIds.contains(
+          requestedUserId,
+        );
+      },
+    ).toList();
+
+    debugPrint(
+      'NOTIFICATIONS LOADED: '
+      '${loadedNotifications.length}',
+    );
+
+    debugPrint(
+      'BLOCKED USER IDS: '
+      '$blockedUserIds',
+    );
+
+    debugPrint(
+      'VISIBLE NOTIFICATIONS: '
+      '${visibleNotifications.length}',
+    );
+
+    for (final notification in visibleNotifications) {
+      debugPrint(
+      'NOTIFICATION ROW: '
+      'type=${notification['type']} | '
+      'title=${notification['title']} | '
+      'message=${notification['message']} | '
+      'requested_user_id=${notification['requested_user_id']} | '
+      'recipient_user_id=${notification['recipient_user_id']} | '
+      'reference_type=${notification['reference_type']} | '
+      'created_at=${notification['created_at']}',
+    );
+  }
+
+    if (!mounted) return;
+
+    setState(() {
+      notifications = visibleNotifications;
+      isLoading = false;
+    });
+  } catch (e) {
+    debugPrint(
+      'LOAD NOTIFICATIONS ERROR: $e',
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = false;
+      errorMessage =
+          'Unable to load notifications.';
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Unable to load notifications: $e',
+        ),
+      ),
+    );
+  }
+}
 
   Future<void> openNotification(
   Map<String, dynamic> notification,

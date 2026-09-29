@@ -31,6 +31,7 @@ class _FamilyTimelinePageState extends State<FamilyTimelinePage> {
   List<Map<String, dynamic>> posts = [];
   Map<String, Map<String, dynamic>> postAuthorProfiles = {};
   List<Map<String, dynamic>> children = [];
+  Set<String> blockedUserIds = {};
 
   bool isLoading = true;
 
@@ -38,12 +39,66 @@ class _FamilyTimelinePageState extends State<FamilyTimelinePage> {
 
   static const Color timelineBackground = Color(0xFFF7F4F8);
 
-  @override
-  void initState() {
-    super.initState();
+ @override
+void initState() {
+  super.initState();
 
-    loadTimeline();
+  initializeTimeline();
+}
+
+Future<void> initializeTimeline() async {
+  await loadBlockedUsers();
+
+  if (!mounted) return;
+
+  await loadTimeline();
+}
+
+// =========================================================
+// LOAD BLOCKED USERS
+// =========================================================
+
+Future<void> loadBlockedUsers() async {
+  final user = supabase.auth.currentUser;
+
+  if (user == null) {
+    blockedUserIds = {};
+    return;
   }
+
+  try {
+    final response = await supabase
+        .from('User_Blocks')
+        .select('blocked_user_id')
+        .eq(
+          'blocker_user_id',
+          user.id,
+        );
+
+    final blocks =
+        List<Map<String, dynamic>>.from(
+      response,
+    );
+
+    blockedUserIds = blocks
+        .map(
+          (block) =>
+              block['blocked_user_id']
+                  ?.toString(),
+        )
+        .whereType<String>()
+        .where(
+          (id) => id.isNotEmpty,
+        )
+        .toSet();
+  } catch (e) {
+    debugPrint(
+      'LOAD TIMELINE BLOCKS ERROR: $e',
+    );
+
+    blockedUserIds = {};
+  }
+}
 
   // =========================================================
   // LOAD TIMELINE
@@ -144,6 +199,20 @@ class _FamilyTimelinePageState extends State<FamilyTimelinePage> {
 
         final loadedPosts = List<Map<String, dynamic>>.from(postsResponse);
 
+        final visiblePosts = loadedPosts.where(
+          (post) {
+            final createdBy = post['created_by']?.toString();
+
+            if (createdBy == null || createdBy.isEmpty) {
+              return true;
+            }
+
+            return !blockedUserIds.contains(
+              createdBy,
+            );
+          },
+        ).toList();
+
         final postAuthorIds = loadedPosts
           .map(
             (post) => post['created_by']?.toString(),)
@@ -206,10 +275,24 @@ class _FamilyTimelinePageState extends State<FamilyTimelinePage> {
               ascending: false,
             );
 
-        loadedPhotos =
-            List<Map<String, dynamic>>.from(
-          photosResponse,
-        );
+        final allLoadedPhotos =
+          List<Map<String, dynamic>>.from(
+            photosResponse,
+          );
+
+        loadedPhotos = allLoadedPhotos.where(
+          (photo) {
+            final createdBy = photo['created_by']?.toString();
+
+          if (createdBy == null || createdBy.isEmpty) {
+            return true;
+          }
+
+          return !blockedUserIds.contains(
+            createdBy,
+          );
+        },
+      ).toList();
 
         final milestonesResponse = await supabase
             .from('Milestones')
@@ -241,7 +324,7 @@ class _FamilyTimelinePageState extends State<FamilyTimelinePage> {
 
         events = List<Map<String, dynamic>>.from(eventsResponse,);
 
-        posts = loadedPosts;
+        posts = visiblePosts;
 
         postAuthorProfiles = loadedPostAuthorProfiles;
 
@@ -1776,7 +1859,7 @@ Widget buildTimelineHeader() {
           : RefreshIndicator(
               color: FolktriColors.primaryIndigo,
 
-              onRefresh: loadTimeline,
+              onRefresh: initializeTimeline,
 
               child: ListView(
                 padding: EdgeInsets.zero,

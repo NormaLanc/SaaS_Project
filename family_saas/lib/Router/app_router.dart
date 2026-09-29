@@ -31,6 +31,8 @@ import '../Pages/App/Settings/notification_settings.dart';
 import '../Pages/App/Settings/support.dart';
 import '../Pages/App/Settings/member_permissions.dart';
 import '../Pages/App/Settings/privacy.dart';
+import '../Pages/App/Admin/moderation_reports.dart';
+import '../Pages/App/Admin/moderation_report_details.dart';
 
 final GoRouter appRouter = GoRouter(
   // initialLocation: kIsWeb ? '/' : '/welcome',
@@ -301,6 +303,22 @@ GoRoute(
   path: '/settings/privacy',
   builder: (context, state) =>
       const PrivacyPage(),
+),
+GoRoute(
+  path: '/settings/moderation',
+  builder: (context, state) =>
+      const ModerationReportsPage(),
+),
+GoRoute(
+  path: '/settings/moderation/report',
+  builder: (context, state) {
+    final report =
+        state.extra as Map<String, dynamic>;
+
+    return ModerationReportDetailsPage(
+      report: report,
+    );
+  },
 ),
 GoRoute(
   path: '/settings/support',

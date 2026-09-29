@@ -787,6 +787,10 @@ if (postAuthorIds.isNotEmpty) {
           false;
     });
 
+    await scrollToTargetPhoto();
+
+    await scrollToTargetPost();
+
     // KEEP your existing photo
     // interaction loading.
     await loadPhotoLikes();
@@ -797,9 +801,7 @@ if (postAuthorIds.isNotEmpty) {
 
     await loadPostCommentCounts();
 
-    await scrollToTargetPhoto();
 
-    await scrollToTargetPost();
 
   } catch (e) {
     debugPrint(
@@ -1191,7 +1193,7 @@ Future<void> loadPostCommentCounts() async {
 
     final response = await supabase
         .from('Family_Post_Comments')
-        .select('post_id, user_id, parent_comment_id')
+        .select('id, post_id, user_id, parent_comment_id',)
         .inFilter(
           'post_id',
           postIds,
@@ -1307,7 +1309,7 @@ Future<void> loadPhotoCommentCounts() async {
 
     final response = await supabase
         .from('Photo_Comments')
-        .select('photo_id, user_id, parent_comment_id')
+        .select('id, photo_id, user_id, parent_comment_id',)
         .inFilter(
           'photo_id',
           photoIds,
@@ -2522,6 +2524,310 @@ Future<void> createFamilyPostCommentLikeNotification({
   }
 }
 
+Future<void> showCommentReportDialog({
+  required BuildContext sheetContext,
+  required String commentId,
+  required String reportedUserId,
+  required String familyId,
+}) async {
+  String? selectedReason;
+  String details = '';
+  bool isSubmitting = false;
+
+  final result = await showDialog<bool>(
+    context: sheetContext,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (
+          context,
+          setDialogState,
+        ) {
+          return AlertDialog(
+            backgroundColor:
+                FolktriColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius:
+                  BorderRadius.circular(22),
+            ),
+            title: const Text(
+              'Report comment',
+              style: TextStyle(
+                color:
+                    FolktriColors.midnightIndigo,
+                fontWeight:
+                    FontWeight.w700,
+              ),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize:
+                    MainAxisSize.min,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Why are you reporting this comment?',
+                    style: TextStyle(
+                      color:
+                          FolktriColors.primaryText,
+                      fontWeight:
+                          FontWeight.w600,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  DropdownButtonFormField<String>(
+                    value: selectedReason,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor:
+                          FolktriColors.background,
+                      border:
+                          OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(
+                          14,
+                        ),
+                        borderSide:
+                            BorderSide.none,
+                      ),
+                    ),
+                    hint: const Text(
+                      'Select a reason',
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value:
+                            'inappropriate_content',
+                        child: Text(
+                          'Inappropriate content',
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value:
+                            'harassment_bullying',
+                        child: Text(
+                          'Harassment or bullying',
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value:
+                            'sexual_content',
+                        child: Text(
+                          'Sexual content',
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value:
+                            'child_safety',
+                        child: Text(
+                          'Content involving a child\'s safety',
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: 'spam',
+                        child: Text('Spam'),
+                      ),
+                      DropdownMenuItem(
+                        value:
+                            'impersonation',
+                        child: Text(
+                          'Impersonation',
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: 'other',
+                        child: Text(
+                          'Something else',
+                        ),
+                      ),
+                    ],
+                    onChanged: isSubmitting
+                        ? null
+                        : (value) {
+                            setDialogState(() {
+                              selectedReason =
+                                  value;
+                            });
+                          },
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  TextFormField(
+                    maxLength: 2000,
+                    maxLines: 4,
+                    onChanged: (value) {
+                      details = value;
+                    },
+                    decoration: InputDecoration(
+                      labelText:
+                          'Additional details (optional)',
+                      alignLabelWithHint: true,
+                      filled: true,
+                      fillColor:
+                          FolktriColors.background,
+                      border:
+                          OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(
+                          14,
+                        ),
+                        borderSide:
+                            BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () {
+                        Navigator.of(
+                          dialogContext,
+                        ).pop(false);
+                      },
+                child: const Text(
+                  'Cancel',
+                ),
+              ),
+
+              FilledButton(
+                onPressed:
+                    isSubmitting ||
+                            selectedReason ==
+                                null
+                        ? null
+                        : () async {
+                            setDialogState(() {
+                              isSubmitting =
+                                  true;
+                            });
+
+                            try {
+                              final user =
+                                  supabase
+                                      .auth
+                                      .currentUser;
+
+                              if (user ==
+                                  null) {
+                                throw Exception(
+                                  'User is not signed in.',
+                                );
+                              }
+
+                              await supabase
+                                  .from(
+                                    'Content_Reports',
+                                  )
+                                  .insert({
+                                'reporter_user_id':
+                                    user.id,
+                                'reported_user_id':
+                                    reportedUserId,
+                                'family_id':
+                                    familyId,
+                                'content_type':
+                                    'post_comment',
+                                'content_id':
+                                    commentId,
+                                'reason':
+                                    selectedReason,
+                                'details':
+                                    details
+                                            .trim()
+                                            .isEmpty
+                                        ? null
+                                        : details
+                                            .trim(),
+                              });
+
+                              if (!dialogContext
+                                  .mounted) {
+                                return;
+                              }
+
+                              Navigator.of(
+                                dialogContext,
+                              ).pop(true);
+                            } catch (e) {
+                              debugPrint(
+                                'SUBMIT COMMENT REPORT ERROR: $e',
+                              );
+
+                              if (!dialogContext
+                                  .mounted) {
+                                return;
+                              }
+
+                              setDialogState(() {
+                                isSubmitting =
+                                    false;
+                              });
+
+                              ScaffoldMessenger
+                                      .of(
+                                dialogContext,
+                              ).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Unable to submit report.',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                style:
+                    FilledButton.styleFrom(
+                  backgroundColor:
+                      FolktriColors
+                          .primaryIndigo,
+                  foregroundColor:
+                      FolktriColors.surface,
+                ),
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child:
+                            CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color:
+                              FolktriColors
+                                  .surface,
+                        ),
+                      )
+                    : const Text(
+                        'Submit Report',
+                      ),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+
+  if (result == true &&
+      sheetContext.mounted) {
+    ScaffoldMessenger.of(
+      sheetContext,
+    ).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Report received. Thank you for helping keep Folktri safe.',
+        ),
+      ),
+    );
+  }
+}
+
 Future<void> showFamilyPostComments(
   String postId,
 ) async {
@@ -3037,37 +3343,97 @@ Future<void> showFamilyPostComments(
   }
 }
 
-          Widget buildThreadedComment(
+          Future<void> reportComment(
   Map<String, dynamic> comment,
-  int depth,
-) {
+) async {
   final commentId =
       comment['id']?.toString() ?? '';
 
-  final profile =
-      comment['profile']
-          as Map<String, dynamic>?;
+  final reportedUserId =
+      comment['user_id']?.toString() ?? '';
 
-  final firstName =
-      profile?['first_name']
-              ?.toString()
-              .trim() ??
-          '';
+  if (commentId.isEmpty ||
+      reportedUserId.isEmpty ||
+      reportedUserId == currentUser.id) {
+    return;
+  }
 
-  final lastName =
-      profile?['last_name']
-              ?.toString()
-              .trim() ??
-          '';
+  try {
+    // Get the family directly from the post being
+    // commented on rather than assuming which family
+    // is currently selected on the Dashboard.
+    final postResponse = await supabase
+        .from('Family_Posts')
+        .select('family_id')
+        .eq('id', postId)
+        .maybeSingle();
 
-  final displayName = [
-    firstName,
-    lastName,
-  ]
-      .where(
-        (name) => name.isNotEmpty,
-      )
-      .join(' ');
+    final familyId =
+        postResponse?['family_id']
+                ?.toString() ??
+            '';
+
+    if (familyId.isEmpty) {
+      throw Exception(
+        'Unable to determine the family for this comment.',
+      );
+    }
+
+    if (!sheetContext.mounted) {
+      return;
+    }
+
+    await showCommentReportDialog(
+      sheetContext: sheetContext,
+      commentId: commentId,
+      reportedUserId: reportedUserId,
+      familyId: familyId,
+    );
+  } catch (e) {
+    debugPrint(
+      'REPORT COMMENT ERROR: $e',
+    );
+
+    if (!sheetContext.mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      sheetContext,
+    ).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Unable to report this comment.',
+        ),
+      ),
+    );
+  }
+}
+
+          Widget buildThreadedComment(Map<String, dynamic> comment, int depth) {
+            final commentId = comment['id']?.toString() ?? '';
+
+            final profile =
+              comment['profile']
+                as Map<String, dynamic>?;
+
+            final firstName =
+              profile?['first_name']
+                ?.toString()
+                .trim() ??
+                '';
+
+            final lastName =
+              profile?['last_name']
+                ?.toString()
+                .trim() ??
+            '';
+
+            final displayName = [firstName, lastName,]
+              .where(
+                (name) => name.isNotEmpty,
+              )
+              .join(' ');
 
   final signedPhotoUrl =
       profile?['signed_photo_url']
@@ -3182,56 +3548,60 @@ Future<void> showFamilyPostComments(
                         ),
                       ),
 
-                      if (isOwnComment)
-                        PopupMenuButton<
-                            String>(
-                          padding:
-                              EdgeInsets.zero,
+                    
+                        PopupMenuButton<String>(
+                          padding: EdgeInsets.zero,
                           icon: Icon(
-                            Icons
-                                .more_vert_rounded,
-                            size:
-                                depth == 0
-                                    ? 19
-                                    : 17,
-                            color:
-                                FolktriColors
-                                    .secondaryText,
+                            Icons.more_vert_rounded,
+                            size: depth == 0 ? 19 : 17,
+                            color:FolktriColors.secondaryText,
                           ),
-                          onSelected:
-                              (value) async {
-                            if (value ==
-                                'delete') {
-                              await deleteComment(
-                                commentId,
-                              );
+                          onSelected: (value) async {
+                            if (value == 'delete' && isOwnComment) {
+                              await deleteComment(commentId,);
+                              return;
+                            }
+
+                            if (value == 'report' && !isOwnComment) {
+                              await reportComment(comment,);
                             }
                           },
-                          itemBuilder:
-                              (context) =>
-                                  const [
-                            PopupMenuItem<
-                                String>(
-                              value:
-                                  'delete',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons
-                                        .delete_outline_rounded,
-                                    size: 19,
+                          itemBuilder: (context) {
+                            if (isOwnComment) {
+                              return const [
+                                PopupMenuItem<String>(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.delete_outline_rounded,
+                                        size: 19,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text('Delete'),
+                                    ],
                                   ),
-                                  SizedBox(
-                                    width: 8,
-                                  ),
-                                  Text(
-                                    'Delete',
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                                ),
+                              ];
+                            }
+
+    return const [
+      PopupMenuItem<String>(
+        value: 'report',
+        child: Row(
+          children: [
+            Icon(
+              Icons.flag_outlined,
+              size: 19,
+            ),
+            SizedBox(width: 8),
+            Text('Report'),
+          ],
+        ),
+      ),
+    ];
+  },
+),
                     ],
                   ),
 
@@ -3745,6 +4115,709 @@ Future<void> showFamilyPostComments(
       );
     },
   );
+}
+
+Future<void> reportPhoto({
+  required Map<String, dynamic> photo,
+}) async {
+  final currentUser = supabase.auth.currentUser;
+
+  if (currentUser == null) {
+    return;
+  }
+
+  final photoId =
+      photo['id']?.toString() ?? '';
+
+  final familyId =
+      photo['family_id']?.toString() ?? '';
+
+  final reportedUserId =
+      photo['created_by']?.toString() ?? '';
+
+  if (photoId.isEmpty ||
+      familyId.isEmpty ||
+      reportedUserId.isEmpty) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Unable to report this photo.',
+        ),
+      ),
+    );
+
+    return;
+  }
+
+  // A member should not report their own photo.
+  if (reportedUserId == currentUser.id) {
+    return;
+  }
+
+  await showPhotoReportDialog(
+    photoId: photoId,
+    familyId: familyId,
+    reportedUserId: reportedUserId,
+  );
+}
+
+Future<void> showPhotoReportDialog({
+  required String photoId,
+  required String familyId,
+  required String reportedUserId,
+}) async {
+  String? selectedReason;
+  String details = '';
+  bool isSubmitting = false;
+
+  const reasons = <Map<String, String>>[
+    {
+      'value': 'inappropriate_content',
+      'label': 'Inappropriate content',
+    },
+    {
+      'value': 'harassment_bullying',
+      'label': 'Harassment or bullying',
+    },
+    {
+      'value': 'sexual_content',
+      'label': 'Sexual content',
+    },
+    {
+      'value': 'child_safety',
+      'label': "Content involving a child's safety",
+    },
+    {
+      'value': 'spam',
+      'label': 'Spam',
+    },
+    {
+      'value': 'impersonation',
+      'label': 'Impersonation',
+    },
+    {
+      'value': 'other',
+      'label': 'Something else',
+    },
+  ];
+
+  final submitted =
+      await showDialog<bool>(
+    context: context,
+    barrierDismissible: !isSubmitting,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (
+          context,
+          setDialogState,
+        ) {
+          return AlertDialog(
+            backgroundColor:
+                FolktriColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius:
+                  BorderRadius.circular(22),
+            ),
+            title: const Text(
+              'Report photo',
+              style: TextStyle(
+                color:
+                    FolktriColors.midnightIndigo,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize:
+                    MainAxisSize.min,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Why are you reporting this photo?',
+                    style: TextStyle(
+                      color:
+                          FolktriColors.primaryText,
+                      fontWeight:
+                          FontWeight.w600,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  ...reasons.map(
+                    (reason) {
+                      final value =
+                          reason['value']!;
+
+                      return RadioListTile<String>(
+                        contentPadding:
+                            EdgeInsets.zero,
+                        dense: true,
+                        value: value,
+                        groupValue:
+                            selectedReason,
+                        activeColor:
+                            FolktriColors
+                                .primaryIndigo,
+                        title: Text(
+                          reason['label']!,
+                          style: const TextStyle(
+                            color:
+                                FolktriColors
+                                    .primaryText,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                        onChanged:
+                            isSubmitting
+                                ? null
+                                : (value) {
+                                    setDialogState(
+                                      () {
+                                        selectedReason =
+                                            value;
+                                      },
+                                    );
+                                  },
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  TextFormField(
+                    initialValue: '',
+                    maxLength: 2000,
+                    maxLines: 4,
+                    onChanged: (value) {
+                      details = value;
+                    },
+                    decoration:
+                        InputDecoration(
+                      labelText:
+                          'Additional details (optional)',
+                      alignLabelWithHint:
+                          true,
+                      filled: true,
+                      fillColor:
+                          FolktriColors.background,
+                      border:
+                          OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(
+                          14,
+                        ),
+                        borderSide:
+                            BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed:
+                    isSubmitting
+                        ? null
+                        : () {
+                            Navigator.of(
+                              dialogContext,
+                            ).pop(false);
+                          },
+                child:
+                    const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed:
+                    isSubmitting ||
+                            selectedReason ==
+                                null
+                        ? null
+                        : () async {
+                            setDialogState(
+                              () {
+                                isSubmitting =
+                                    true;
+                              },
+                            );
+
+                            try {
+                              await supabase
+                                  .from(
+                                    'Content_Reports',
+                                  )
+                                  .insert({
+                                'reporter_user_id':
+                                    supabase
+                                        .auth
+                                        .currentUser!
+                                        .id,
+                                'reported_user_id':
+                                    reportedUserId,
+                                'family_id':
+                                    familyId,
+                                'content_type':
+                                    'photo',
+                                'content_id':
+                                    photoId,
+                                'reason':
+                                    selectedReason,
+                                'details':
+                                    details
+                                            .trim()
+                                            .isEmpty
+                                        ? null
+                                        : details
+                                            .trim(),
+                              });
+
+                              if (!dialogContext
+                                  .mounted) {
+                                return;
+                              }
+
+                              Navigator.of(
+                                dialogContext,
+                              ).pop(true);
+                            } on PostgrestException
+                                catch (e) {
+                              debugPrint(
+                                'REPORT PHOTO ERROR: '
+                                '${e.message}',
+                              );
+
+                              if (!dialogContext
+                                  .mounted) {
+                                return;
+                              }
+
+                              setDialogState(
+                                () {
+                                  isSubmitting =
+                                      false;
+                                },
+                              );
+
+                              ScaffoldMessenger.of(
+                                dialogContext,
+                              ).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Unable to submit this report.',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                style:
+                    FilledButton.styleFrom(
+                  backgroundColor:
+                      FolktriColors
+                          .primaryIndigo,
+                  foregroundColor:
+                      FolktriColors.surface,
+                ),
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child:
+                            CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color:
+                              FolktriColors
+                                  .surface,
+                        ),
+                      )
+                    : const Text(
+                        'Submit Report',
+                      ),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+
+  if (submitted != true || !mounted) {
+    return;
+  }
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text(
+        'Report received. Thank you for helping keep Folktri safe.',
+      ),
+    ),
+  );
+}
+
+  Future<void> reportPhotoComment({
+  required Map<String, dynamic> comment,
+  required String photoId,
+  required BuildContext sheetContext,
+}) async {
+  final currentUser =
+      supabase.auth.currentUser;
+
+  if (currentUser == null) {
+    return;
+  }
+
+  final commentId =
+      comment['id']?.toString() ?? '';
+
+  final reportedUserId =
+      comment['user_id']?.toString() ?? '';
+
+  if (commentId.isEmpty ||
+      reportedUserId.isEmpty ||
+      reportedUserId == currentUser.id) {
+    return;
+  }
+
+  try {
+    final photo = await supabase
+        .from('Photos')
+        .select('family_id')
+        .eq('id', photoId)
+        .maybeSingle();
+
+    final familyId =
+        photo?['family_id']
+                ?.toString() ??
+            '';
+
+    if (familyId.isEmpty) {
+      throw Exception(
+        'Unable to determine the family for this photo.',
+      );
+    }
+
+    if (!sheetContext.mounted) {
+      return;
+    }
+
+    await showPhotoCommentReportDialog(
+      sheetContext: sheetContext,
+      commentId: commentId,
+      reportedUserId: reportedUserId,
+      familyId: familyId,
+    );
+  } catch (e) {
+    debugPrint(
+      'REPORT PHOTO COMMENT ERROR: $e',
+    );
+
+    if (!sheetContext.mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      sheetContext,
+    ).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Unable to report this comment.',
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> showPhotoCommentReportDialog({
+  required BuildContext sheetContext,
+  required String commentId,
+  required String reportedUserId,
+  required String familyId,
+}) async {
+  String? selectedReason;
+  String details = '';
+  bool isSubmitting = false;
+
+  final submitted =
+      await showDialog<bool>(
+    context: sheetContext,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (
+          context,
+          setDialogState,
+        ) {
+          return AlertDialog(
+            backgroundColor:
+                FolktriColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius:
+                  BorderRadius.circular(22),
+            ),
+            title: const Text(
+              'Report comment',
+              style: TextStyle(
+                color:
+                    FolktriColors.midnightIndigo,
+                fontWeight:
+                    FontWeight.w700,
+              ),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize:
+                    MainAxisSize.min,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Why are you reporting this comment?',
+                    style: TextStyle(
+                      color:
+                          FolktriColors.primaryText,
+                      fontWeight:
+                          FontWeight.w600,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  DropdownButtonFormField<String>(
+                    value: selectedReason,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor:
+                          FolktriColors.background,
+                      border:
+                          OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(
+                          14,
+                        ),
+                        borderSide:
+                            BorderSide.none,
+                      ),
+                    ),
+                    hint: const Text(
+                      'Select a reason',
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value:
+                            'inappropriate_content',
+                        child: Text(
+                          'Inappropriate content',
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value:
+                            'harassment_bullying',
+                        child: Text(
+                          'Harassment or bullying',
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value:
+                            'sexual_content',
+                        child: Text(
+                          'Sexual content',
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value:
+                            'child_safety',
+                        child: Text(
+                          'Content involving a child\'s safety',
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: 'spam',
+                        child: Text('Spam'),
+                      ),
+                      DropdownMenuItem(
+                        value:
+                            'impersonation',
+                        child: Text(
+                          'Impersonation',
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: 'other',
+                        child: Text(
+                          'Something else',
+                        ),
+                      ),
+                    ],
+                    onChanged: isSubmitting
+                        ? null
+                        : (value) {
+                            setDialogState(() {
+                              selectedReason =
+                                  value;
+                            });
+                          },
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  TextFormField(
+                    initialValue: '',
+                    maxLength: 2000,
+                    maxLines: 4,
+                    onChanged: (value) {
+                      details = value;
+                    },
+                    decoration: InputDecoration(
+                      labelText:
+                          'Additional details (optional)',
+                      alignLabelWithHint: true,
+                      filled: true,
+                      fillColor:
+                          FolktriColors.background,
+                      border:
+                          OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(
+                          14,
+                        ),
+                        borderSide:
+                            BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () {
+                        Navigator.of(
+                          dialogContext,
+                        ).pop(false);
+                      },
+                child: const Text('Cancel'),
+              ),
+
+              FilledButton(
+                onPressed:
+                    isSubmitting ||
+                            selectedReason ==
+                                null
+                        ? null
+                        : () async {
+                            setDialogState(() {
+                              isSubmitting =
+                                  true;
+                            });
+
+                            try {
+                              await supabase
+                                  .from(
+                                    'Content_Reports',
+                                  )
+                                  .insert({
+                                'reporter_user_id':
+                                    supabase.auth.currentUser!.id,
+                                'reported_user_id':
+                                    reportedUserId,
+                                'family_id':
+                                    familyId,
+                                'content_type':
+                                    'photo_comment',
+                                'content_id':
+                                    commentId,
+                                'reason':
+                                    selectedReason,
+                                'details':
+                                    details
+                                            .trim()
+                                            .isEmpty
+                                        ? null
+                                        : details
+                                            .trim(),
+                              });
+
+                              if (!dialogContext
+                                  .mounted) {
+                                return;
+                              }
+
+                              Navigator.of(
+                                dialogContext,
+                              ).pop(true);
+                            } catch (e) {
+                              debugPrint(
+                                'SUBMIT PHOTO COMMENT REPORT ERROR: $e',
+                              );
+
+                              if (!dialogContext
+                                  .mounted) {
+                                return;
+                              }
+
+                              setDialogState(() {
+                                isSubmitting =
+                                    false;
+                              });
+
+                              ScaffoldMessenger
+                                      .of(
+                                dialogContext,
+                              ).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Unable to submit report.',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                style:
+                    FilledButton.styleFrom(
+                  backgroundColor:
+                      FolktriColors.primaryIndigo,
+                  foregroundColor:
+                      FolktriColors.surface,
+                ),
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child:
+                            CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color:
+                              FolktriColors.surface,
+                        ),
+                      )
+                    : const Text(
+                        'Submit Report',
+                      ),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+
+  if (submitted == true &&
+      sheetContext.mounted) {
+    ScaffoldMessenger.of(
+      sheetContext,
+    ).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Report received. Thank you for helping keep Folktri safe.',
+        ),
+      ),
+    );
+  }
 }
 
 Future<void> showPhotoComments(String photoId) async {
@@ -4388,6 +5461,14 @@ Future<void> showPhotoComments(String photoId) async {
             },
             onDelete:
                 deleteComment,
+
+            onReport: (comment) async {
+              await reportPhotoComment(
+                comment: comment,
+                photoId: photoId,
+                sheetContext: sheetContext,
+              );
+            },
           );
         },
       );
@@ -4598,6 +5679,9 @@ Widget buildPhotoCommentThread({
   required Future<void> Function(
     String commentId,
   ) onDelete,
+  required Future<void> Function(
+  Map<String, dynamic> comment,
+) onReport,
 }) {
   final commentId =
       comment['id']?.toString() ?? '';
@@ -4665,6 +5749,9 @@ Widget buildPhotoCommentThread({
         },
         onDelete:
             onDelete,
+        onReport: (){
+          onReport(comment);
+        },
       ),
 
       if (replies.isNotEmpty)
@@ -4716,7 +5803,11 @@ Widget buildPhotoCommentThread({
                     );
                   },
                   onDelete:
-                      onDelete,
+                    onDelete,
+
+                  onReport: () {
+                    onReport(reply);
+                  },
                   isReply: true,
                 );
               },
@@ -4739,6 +5830,8 @@ Widget buildPhotoCommentTile({
   required Future<void> Function(
     String commentId,
   ) onDelete,
+
+  required VoidCallback onReport,
 
    bool isReply = false,
 }) {
@@ -5072,49 +6165,70 @@ Row(
           ),
         ),
 
-        if (isOwnComment)
+        //if (isOwnComment)
           PopupMenuButton<String>(
-            padding:
-                EdgeInsets.zero,
-            icon: const Icon(
-              Icons.more_vert_rounded,
-              size: 19,
-              color:
-                  FolktriColors
-                      .secondaryText,
-            ),
-            onSelected:
-                (value) async {
-              if (value ==
-                  'delete') {
-                await onDelete(
-                  comment['id']
-                      .toString(),
-                );
-              }
-            },
-            itemBuilder:
-                (context) => const [
-              PopupMenuItem<String>(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons
-                          .delete_outline_rounded,
-                      size: 19,
-                    ),
-                    SizedBox(
-                      width: 8,
-                    ),
-                    Text(
-                      'Delete comment',
-                    ),
-                  ],
-                ),
+  padding: EdgeInsets.zero,
+  icon: const Icon(
+    Icons.more_vert_rounded,
+    size: 19,
+    color:
+        FolktriColors.secondaryText,
+  ),
+  onSelected: (value) async {
+    if (value == 'delete' &&
+        isOwnComment) {
+      await onDelete(
+        comment['id'].toString(),
+      );
+      return;
+    }
+
+    if (value == 'report' &&
+        !isOwnComment) {
+      onReport();
+    }
+  },
+  itemBuilder: (context) {
+    if (isOwnComment) {
+      return const [
+        PopupMenuItem<String>(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(
+                Icons
+                    .delete_outline_rounded,
+                size: 19,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Delete comment',
               ),
             ],
           ),
+        ),
+      ];
+    }
+
+    return const [
+      PopupMenuItem<String>(
+        value: 'report',
+        child: Row(
+          children: [
+            Icon(
+              Icons.flag_outlined,
+              size: 19,
+            ),
+            SizedBox(width: 8),
+            Text(
+              'Report comment',
+            ),
+          ],
+        ),
+      ),
+    ];
+  },
+),
       ],
     ),
   );
@@ -6127,6 +7241,16 @@ String childName = '';
   final photoId =
     photo['id']?.toString() ?? '';
 
+    final currentUserId =
+    supabase.auth.currentUser?.id ?? '';
+
+    final photoOwnerId =
+      photo['created_by']?.toString() ?? '';
+
+    final isOwnPhoto =
+      photoOwnerId.isNotEmpty &&
+      photoOwnerId == currentUserId;
+
   final photoCardKey = 
     photoCardKeys.putIfAbsent(photoId, () => GlobalKey(),);
 
@@ -6228,11 +7352,49 @@ String childName = '';
                 ),
               ),
 
-              const Icon(
-                Icons.lock_outline_rounded,
-                size: 16,
-                color: FolktriColors.secondaryText,
-              ),
+              if (!isOwnPhoto &&
+    photoOwnerId.isNotEmpty)
+  PopupMenuButton<String>(
+    tooltip: 'Photo options',
+    padding: EdgeInsets.zero,
+    icon: const Icon(
+      Icons.more_vert_rounded,
+      color:
+          FolktriColors.secondaryText,
+    ),
+    onSelected: (value) async {
+      if (value == 'report') {
+        await reportPhoto(
+          photo: photo,
+        );
+      }
+    },
+    itemBuilder: (context) =>
+        const [
+      PopupMenuItem<String>(
+        value: 'report',
+        child: Row(
+          children: [
+            Icon(
+              Icons.flag_outlined,
+              size: 19,
+              color:
+                  FolktriColors.dustyRose,
+            ),
+            SizedBox(width: 8),
+            Text('Report photo'),
+          ],
+        ),
+      ),
+    ],
+  )
+else
+  const Icon(
+    Icons.lock_outline_rounded,
+    size: 16,
+    color:
+        FolktriColors.secondaryText,
+  ),
             ],
           ),
         ),

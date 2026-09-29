@@ -18,6 +18,10 @@ class _SettingsPageState extends State<SettingsPage> {
 
   final supabase = Supabase.instance.client;
 
+  //Variables to verify if the user is an admin
+  bool isAdmin = false;
+  bool isCheckingAdmin = true;
+
   bool isLoggingOut = false;
   bool isDeletingAccount = false;
   bool deleteSharedPhotos = false;
@@ -26,6 +30,64 @@ class _SettingsPageState extends State<SettingsPage> {
   final Set<String> childIdsToDelete = {};
 
   bool get isProcessing => isLoggingOut || isDeletingAccount;
+
+  @override
+void initState() {
+  super.initState();
+  checkAdminStatus();
+}
+
+Future<void> checkAdminStatus() async {
+  final user = supabase.auth.currentUser;
+
+  if (user == null) {
+    if (!mounted) return;
+
+    setState(() {
+      isAdmin = false;
+      isCheckingAdmin = false;
+    });
+
+    return;
+  }
+
+  try {
+    final response = await supabase
+        .from('App_Admins')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+    if (!mounted) return;
+
+    setState(() {
+      isAdmin = response != null;
+      isCheckingAdmin = false;
+    });
+  } on PostgrestException catch (e) {
+    debugPrint(
+      'CHECK ADMIN STATUS ERROR: ${e.message}',
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      isAdmin = false;
+      isCheckingAdmin = false;
+    });
+  } catch (e) {
+    debugPrint(
+      'CHECK ADMIN STATUS ERROR: $e',
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      isAdmin = false;
+      isCheckingAdmin = false;
+    });
+  }
+}
 
   // ---------------------------------------------------------
   // LOG OUT
@@ -1433,6 +1495,32 @@ Future<void> confirmPermanentDeletion() async {
             ),
 
             const SizedBox(height: 26),
+
+            if (!isCheckingAdmin && isAdmin) ...[
+              const SizedBox(height: 26),
+
+              // FOLKTRI ADMIN
+              buildSectionTitle('FOLKTRI ADMIN'),
+
+              buildSettingsCard(
+                children: [
+                  buildSettingsTile(
+                    icon: Icons.admin_panel_settings_rounded,
+                    title: 'Moderation',
+                    subtitle: 'Review reported content and safety cases',
+                    onTap: () {
+                    // Navigation will be added after
+                    // the moderation page exists.
+                      context.push(
+                        '/settings/moderation',
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+
+const SizedBox(height: 26),
 
             // SUPPORT
             buildSectionTitle('SUPPORT'),
