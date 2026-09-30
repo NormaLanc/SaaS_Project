@@ -2527,14 +2527,12 @@ Future<void> createFamilyPostCommentLikeNotification({
 Future<void> showCommentReportDialog({
   required BuildContext sheetContext,
   required String commentId,
-  required String reportedUserId,
-  required String familyId,
 }) async {
   String? selectedReason;
   String details = '';
   bool isSubmitting = false;
 
-  final result = await showDialog<bool>(
+  await showDialog<bool>(
     context: sheetContext,
     builder: (dialogContext) {
       return StatefulBuilder(
@@ -2722,31 +2720,48 @@ Future<void> showCommentReportDialog({
                                 );
                               }
 
-                              await supabase
-                                  .from(
-                                    'Content_Reports',
-                                  )
-                                  .insert({
-                                'reporter_user_id':
-                                    user.id,
-                                'reported_user_id':
-                                    reportedUserId,
-                                'family_id':
-                                    familyId,
-                                'content_type':
-                                    'post_comment',
-                                'content_id':
-                                    commentId,
-                                'reason':
-                                    selectedReason,
-                                'details':
-                                    details
-                                            .trim()
-                                            .isEmpty
-                                        ? null
-                                        : details
-                                            .trim(),
-                              });
+                              await supabase.rpc(
+  'submit_content_report',
+  params: {
+    'p_content_type':
+        'post_comment',
+    'p_content_id':
+        commentId,
+    'p_reason':
+        selectedReason,
+    'p_details':
+        details.trim().isEmpty
+            ? null
+            : details.trim(),
+  },
+);
+
+
+                              // await supabase
+                              //     .from(
+                              //       'Content_Reports',
+                              //     )
+                              //     .insert({
+                              //   'reporter_user_id':
+                              //       user.id,
+                              //   'reported_user_id':
+                              //       reportedUserId,
+                              //   'family_id':
+                              //       familyId,
+                              //   'content_type':
+                              //       'post_comment',
+                              //   'content_id':
+                              //       commentId,
+                              //   'reason':
+                              //       selectedReason,
+                              //   'details':
+                              //       details
+                              //               .trim()
+                              //               .isEmpty
+                              //           ? null
+                              //           : details
+                              //               .trim(),
+                              // });
 
                               if (!dialogContext
                                   .mounted) {
@@ -2756,6 +2771,20 @@ Future<void> showCommentReportDialog({
                               Navigator.of(
                                 dialogContext,
                               ).pop(true);
+
+                              if (!mounted) {
+                                return;
+                              }
+
+                              ScaffoldMessenger.of(context)
+                                .showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Report received. Thank you for helping keep Folktri safe.',
+                                  ),
+                                ),
+                              );
+
                             } catch (e) {
                               debugPrint(
                                 'SUBMIT COMMENT REPORT ERROR: $e',
@@ -2813,19 +2842,6 @@ Future<void> showCommentReportDialog({
       );
     },
   );
-
-  if (result == true &&
-      sheetContext.mounted) {
-    ScaffoldMessenger.of(
-      sheetContext,
-    ).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Report received. Thank you for helping keep Folktri safe.',
-        ),
-      ),
-    );
-  }
 }
 
 Future<void> showFamilyPostComments(
@@ -3349,51 +3365,7 @@ Future<void> showFamilyPostComments(
   final commentId =
       comment['id']?.toString() ?? '';
 
-  final reportedUserId =
-      comment['user_id']?.toString() ?? '';
-
-  if (commentId.isEmpty ||
-      reportedUserId.isEmpty ||
-      reportedUserId == currentUser.id) {
-    return;
-  }
-
-  try {
-    // Get the family directly from the post being
-    // commented on rather than assuming which family
-    // is currently selected on the Dashboard.
-    final postResponse = await supabase
-        .from('Family_Posts')
-        .select('family_id')
-        .eq('id', postId)
-        .maybeSingle();
-
-    final familyId =
-        postResponse?['family_id']
-                ?.toString() ??
-            '';
-
-    if (familyId.isEmpty) {
-      throw Exception(
-        'Unable to determine the family for this comment.',
-      );
-    }
-
-    if (!sheetContext.mounted) {
-      return;
-    }
-
-    await showCommentReportDialog(
-      sheetContext: sheetContext,
-      commentId: commentId,
-      reportedUserId: reportedUserId,
-      familyId: familyId,
-    );
-  } catch (e) {
-    debugPrint(
-      'REPORT COMMENT ERROR: $e',
-    );
-
+  if (commentId.isEmpty) {
     if (!sheetContext.mounted) {
       return;
     }
@@ -3407,9 +3379,15 @@ Future<void> showFamilyPostComments(
         ),
       ),
     );
-  }
-}
 
+    return;
+  }
+
+  await showCommentReportDialog(
+    sheetContext: sheetContext,
+    commentId: commentId,
+  );
+}
           Widget buildThreadedComment(Map<String, dynamic> comment, int depth) {
             final commentId = comment['id']?.toString() ?? '';
 
@@ -4129,15 +4107,8 @@ Future<void> reportPhoto({
   final photoId =
       photo['id']?.toString() ?? '';
 
-  final familyId =
-      photo['family_id']?.toString() ?? '';
 
-  final reportedUserId =
-      photo['created_by']?.toString() ?? '';
-
-  if (photoId.isEmpty ||
-      familyId.isEmpty ||
-      reportedUserId.isEmpty) {
+  if (photoId.isEmpty) {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -4151,22 +4122,13 @@ Future<void> reportPhoto({
     return;
   }
 
-  // A member should not report their own photo.
-  if (reportedUserId == currentUser.id) {
-    return;
-  }
-
   await showPhotoReportDialog(
     photoId: photoId,
-    familyId: familyId,
-    reportedUserId: reportedUserId,
   );
 }
 
 Future<void> showPhotoReportDialog({
   required String photoId,
-  required String familyId,
-  required String reportedUserId,
 }) async {
   String? selectedReason;
   String details = '';
@@ -4346,35 +4308,18 @@ Future<void> showPhotoReportDialog({
                             );
 
                             try {
-                              await supabase
-                                  .from(
-                                    'Content_Reports',
-                                  )
-                                  .insert({
-                                'reporter_user_id':
-                                    supabase
-                                        .auth
-                                        .currentUser!
-                                        .id,
-                                'reported_user_id':
-                                    reportedUserId,
-                                'family_id':
-                                    familyId,
-                                'content_type':
-                                    'photo',
-                                'content_id':
-                                    photoId,
-                                'reason':
-                                    selectedReason,
-                                'details':
-                                    details
-                                            .trim()
-                                            .isEmpty
-                                        ? null
-                                        : details
-                                            .trim(),
-                              });
-
+                              await supabase.rpc(
+  'submit_content_report',
+  params: {
+    'p_content_type': 'photo',
+    'p_content_id': photoId,
+    'p_reason': selectedReason,
+    'p_details':
+        details.trim().isEmpty
+            ? null
+            : details.trim(),
+  },
+);
                               if (!dialogContext
                                   .mounted) {
                                 return;
@@ -4459,7 +4404,6 @@ Future<void> showPhotoReportDialog({
 
   Future<void> reportPhotoComment({
   required Map<String, dynamic> comment,
-  required String photoId,
   required BuildContext sheetContext,
 }) async {
   final currentUser =
@@ -4472,48 +4416,7 @@ Future<void> showPhotoReportDialog({
   final commentId =
       comment['id']?.toString() ?? '';
 
-  final reportedUserId =
-      comment['user_id']?.toString() ?? '';
-
-  if (commentId.isEmpty ||
-      reportedUserId.isEmpty ||
-      reportedUserId == currentUser.id) {
-    return;
-  }
-
-  try {
-    final photo = await supabase
-        .from('Photos')
-        .select('family_id')
-        .eq('id', photoId)
-        .maybeSingle();
-
-    final familyId =
-        photo?['family_id']
-                ?.toString() ??
-            '';
-
-    if (familyId.isEmpty) {
-      throw Exception(
-        'Unable to determine the family for this photo.',
-      );
-    }
-
-    if (!sheetContext.mounted) {
-      return;
-    }
-
-    await showPhotoCommentReportDialog(
-      sheetContext: sheetContext,
-      commentId: commentId,
-      reportedUserId: reportedUserId,
-      familyId: familyId,
-    );
-  } catch (e) {
-    debugPrint(
-      'REPORT PHOTO COMMENT ERROR: $e',
-    );
-
+  if (commentId.isEmpty) {
     if (!sheetContext.mounted) {
       return;
     }
@@ -4527,14 +4430,19 @@ Future<void> showPhotoReportDialog({
         ),
       ),
     );
+
+    return;
   }
+    await showPhotoCommentReportDialog(
+      sheetContext: sheetContext,
+      commentId: commentId,
+    );
+  
 }
 
 Future<void> showPhotoCommentReportDialog({
   required BuildContext sheetContext,
   required String commentId,
-  required String reportedUserId,
-  required String familyId,
 }) async {
   String? selectedReason;
   String details = '';
@@ -4716,31 +4624,18 @@ Future<void> showPhotoCommentReportDialog({
                             });
 
                             try {
-                              await supabase
-                                  .from(
-                                    'Content_Reports',
-                                  )
-                                  .insert({
-                                'reporter_user_id':
-                                    supabase.auth.currentUser!.id,
-                                'reported_user_id':
-                                    reportedUserId,
-                                'family_id':
-                                    familyId,
-                                'content_type':
-                                    'photo_comment',
-                                'content_id':
-                                    commentId,
-                                'reason':
-                                    selectedReason,
-                                'details':
-                                    details
-                                            .trim()
-                                            .isEmpty
-                                        ? null
-                                        : details
-                                            .trim(),
-                              });
+                              await supabase.rpc(
+                                'submit_content_report',
+                                params: {
+                                  'p_content_type': 'photo_comment',
+                                  'p_content_id': commentId,
+                                  'p_reason': selectedReason,
+                                  'p_details':
+                                    details.trim().isEmpty
+                                    ? null
+                                    : details.trim(),
+                                  },
+                                );
 
                               if (!dialogContext
                                   .mounted) {
@@ -5465,7 +5360,7 @@ Future<void> showPhotoComments(String photoId) async {
             onReport: (comment) async {
               await reportPhotoComment(
                 comment: comment,
-                photoId: photoId,
+               // photoId: photoId,
                 sheetContext: sheetContext,
               );
             },
@@ -6430,15 +6325,13 @@ Future<void> showFamilyPostReportDialog({
   final postId =
       post['id']?.toString() ?? '';
 
-  final familyId =
-      post['family_id']?.toString() ?? '';
+  // final familyId =
+  //     post['family_id']?.toString() ?? '';
 
-  final reportedUserId =
-      post['created_by']?.toString() ?? '';
+  // final reportedUserId =
+  //     post['created_by']?.toString() ?? '';
 
-  if (postId.isEmpty ||
-      familyId.isEmpty ||
-      reportedUserId.isEmpty) {
+  if (postId.isEmpty) {
     ScaffoldMessenger.of(context)
         .showSnackBar(
       const SnackBar(
@@ -6479,29 +6372,17 @@ Future<void> showFamilyPostReportDialog({
             });
 
             try {
-              await supabase
-                  .from('Content_Reports')
-                  .insert({
-                'reporter_user_id':
-                    user.id,
-                'reported_user_id':
-                    reportedUserId,
-                'family_id':
-                    familyId,
-                'content_type':
-                    'family_post',
-                'content_id':
-                    postId,
-                'reason':
-                    selectedReason,
-                'details':
-                    detailsController.text
-                            .trim()
-                            .isEmpty
-                        ? null
-                        : detailsController.text
-                            .trim(),
-              });
+              await supabase.rpc(
+                'submit_content_report',
+                params: {
+                  'p_content_type': 'family_post',
+                  'p_content_id': postId,
+                  'p_reason': selectedReason,
+                  'p_details': detailsController.text.trim().isEmpty
+                    ? null
+                    : detailsController.text.trim(),
+                },
+              );
 
               if (!dialogContext.mounted) {
                 return;
