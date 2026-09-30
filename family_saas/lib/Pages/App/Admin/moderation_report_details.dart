@@ -277,14 +277,12 @@ class _ModerationReportDetailsPageState
   final reportId =
       currentReport['id']?.toString() ?? '';
 
-  final contentId =
-      currentReport['content_id']?.toString() ?? '';
-
   final contentType =
-      currentReport['content_type']?.toString() ?? '';
+      currentReport['content_type']
+              ?.toString() ??
+          '';
 
   if (reportId.isEmpty ||
-      contentId.isEmpty ||
       contentType != 'family_post') {
     return false;
   }
@@ -294,55 +292,37 @@ class _ModerationReportDetailsPageState
   });
 
   try {
-    // Delete only the exact reported Family Post.
-    await supabase
-        .from('Family_Posts')
-        .delete()
-        .eq('id', contentId);
+    await supabase.rpc(
+      'moderate_reported_content',
+      params: {
+        'p_report_id': reportId,
+        'p_admin_notes':
+            adminNotes.trim().isEmpty
+                ? null
+                : adminNotes.trim(),
+      },
+    );
 
-    // Verify that the reported post is no longer
-    // visible/existing before recording action_taken.
-    final remainingPost = await supabase
-        .from('Family_Posts')
-        .select('id')
-        .eq('id', contentId)
-        .maybeSingle();
-
-    if (remainingPost != null) {
-      throw Exception(
-        'Reported Family Post still exists after deletion.',
-      );
+    if (!mounted) {
+      return true;
     }
 
-    final completedAt =
-        DateTime.now().toUtc().toIso8601String();
-
-    final finalNotes = adminNotes.trim().isEmpty
-        ? 'Reported Family Post removed by moderator.'
-        : 'Reported Family Post removed by moderator.\n\n'
-            '${adminNotes.trim()}';
-
-    final updates = <String, dynamic>{
-      'status': 'action_taken',
-      'reviewed_by': user.id,
-      'reviewed_at': completedAt,
-      'admin_notes': finalNotes,
-    };
-
-    await supabase
-        .from('Content_Reports')
-        .update(updates)
-        .eq('id', reportId);
+    final refreshedReport =
+        await supabase
+            .from('Content_Reports')
+            .select()
+            .eq('id', reportId)
+            .single();
 
     if (!mounted) {
       return true;
     }
 
     setState(() {
-      currentReport = {
-        ...currentReport,
-        ...updates,
-      };
+      currentReport =
+          Map<String, dynamic>.from(
+        refreshedReport,
+      );
 
       reportedContent = null;
       isUpdatingReport = false;
@@ -351,7 +331,7 @@ class _ModerationReportDetailsPageState
     return true;
   } on PostgrestException catch (e) {
     debugPrint(
-      'REMOVE REPORTED FAMILY POST ERROR: '
+      'REMOVE REPORTED FAMILY POST RPC ERROR: '
       '${e.message}',
     );
 
@@ -363,7 +343,8 @@ class _ModerationReportDetailsPageState
       isUpdatingReport = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
       SnackBar(
         content: Text(
           'Unable to remove the reported post: '
@@ -375,7 +356,7 @@ class _ModerationReportDetailsPageState
     return false;
   } catch (e) {
     debugPrint(
-      'REMOVE REPORTED FAMILY POST ERROR: $e',
+      'REMOVE REPORTED FAMILY POST RPC ERROR: $e',
     );
 
     if (!mounted) {
@@ -386,7 +367,8 @@ class _ModerationReportDetailsPageState
       isUpdatingReport = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
       const SnackBar(
         content: Text(
           'Unable to remove the reported post.',
@@ -414,18 +396,10 @@ class _ModerationReportDetailsPageState
   final reportId =
       currentReport['id']?.toString() ?? '';
 
-  final contentId =
-      currentReport['content_id']
-              ?.toString() ??
-          '';
-
   final contentType =
-      currentReport['content_type']
-              ?.toString() ??
-          '';
+      currentReport['content_type']?.toString() ?? '';
 
   if (reportId.isEmpty ||
-      contentId.isEmpty ||
       contentType != 'post_comment') {
     return false;
   }
@@ -435,59 +409,37 @@ class _ModerationReportDetailsPageState
   });
 
   try {
-    await supabase
-        .from('Family_Post_Comments')
-        .delete()
-        .eq('id', contentId);
+    await supabase.rpc(
+      'moderate_reported_content',
+      params: {
+        'p_report_id': reportId,
+        'p_admin_notes':
+            adminNotes.trim().isEmpty
+                ? null
+                : adminNotes.trim(),
+      },
+    );
 
-    // Confirm the reported comment is gone before
-    // recording a successful moderation action.
-    final remainingComment = await supabase
-        .from('Family_Post_Comments')
-        .select('id')
-        .eq('id', contentId)
-        .maybeSingle();
-
-    if (remainingComment != null) {
-      throw Exception(
-        'Reported comment still exists after deletion.',
-      );
+    if (!mounted) {
+      return true;
     }
 
-    final completedAt =
-        DateTime.now()
-            .toUtc()
-            .toIso8601String();
-
-    final finalNotes =
-        adminNotes.trim().isEmpty
-            ? 'Reported Family Post comment '
-                'removed by moderator.'
-            : 'Reported Family Post comment '
-                'removed by moderator.\n\n'
-                '${adminNotes.trim()}';
-
-    final updates = <String, dynamic>{
-      'status': 'action_taken',
-      'reviewed_by': user.id,
-      'reviewed_at': completedAt,
-      'admin_notes': finalNotes,
-    };
-
-    await supabase
-        .from('Content_Reports')
-        .update(updates)
-        .eq('id', reportId);
+    final refreshedReport =
+        await supabase
+            .from('Content_Reports')
+            .select()
+            .eq('id', reportId)
+            .single();
 
     if (!mounted) {
       return true;
     }
 
     setState(() {
-      currentReport = {
-        ...currentReport,
-        ...updates,
-      };
+      currentReport =
+          Map<String, dynamic>.from(
+        refreshedReport,
+      );
 
       reportedContent = null;
       isUpdatingReport = false;
@@ -496,7 +448,7 @@ class _ModerationReportDetailsPageState
     return true;
   } on PostgrestException catch (e) {
     debugPrint(
-      'REMOVE REPORTED COMMENT ERROR: '
+      'REMOVE REPORTED POST COMMENT RPC ERROR: '
       '${e.message}',
     );
 
@@ -512,8 +464,8 @@ class _ModerationReportDetailsPageState
         .showSnackBar(
       SnackBar(
         content: Text(
-          'Unable to remove the reported '
-          'comment: ${e.message}',
+          'Unable to remove the reported comment: '
+          '${e.message}',
         ),
       ),
     );
@@ -521,7 +473,7 @@ class _ModerationReportDetailsPageState
     return false;
   } catch (e) {
     debugPrint(
-      'REMOVE REPORTED COMMENT ERROR: $e',
+      'REMOVE REPORTED POST COMMENT RPC ERROR: $e',
     );
 
     if (!mounted) {
@@ -545,7 +497,155 @@ class _ModerationReportDetailsPageState
   }
 }
 
-  Future<bool> removeReportedPhoto({
+//   Future<bool> removeReportedPhoto({
+//   required String adminNotes,
+// }) async {
+//   if (isUpdatingReport) {
+//     return false;
+//   }
+
+//   final user = supabase.auth.currentUser;
+
+//   if (user == null) {
+//     return false;
+//   }
+
+//   final reportId =
+//       currentReport['id']?.toString() ?? '';
+
+//   final contentId =
+//       currentReport['content_id']
+//               ?.toString() ??
+//           '';
+
+//   final contentType =
+//       currentReport['content_type']
+//               ?.toString() ??
+//           '';
+
+//   if (reportId.isEmpty ||
+//       contentId.isEmpty ||
+//       contentType != 'photo') {
+//     return false;
+//   }
+
+//   setState(() {
+//     isUpdatingReport = true;
+//   });
+
+//   try {
+//     // Delete ONLY the reported Photos database row.
+//     //
+//     // Do not delete the underlying Storage object here.
+//     // The same image may also be referenced by a
+//     // Milestone.
+//     await supabase
+//         .from('Photos')
+//         .delete()
+//         .eq('id', contentId);
+
+//     // Confirm the Photos row is actually gone before
+//     // recording a successful moderation action.
+//     final remainingPhoto = await supabase
+//         .from('Photos')
+//         .select('id')
+//         .eq('id', contentId)
+//         .maybeSingle();
+
+//     if (remainingPhoto != null) {
+//       throw Exception(
+//         'Reported photo still exists after deletion.',
+//       );
+//     }
+
+//     final completedAt =
+//         DateTime.now()
+//             .toUtc()
+//             .toIso8601String();
+
+//     final finalNotes =
+//         adminNotes.trim().isEmpty
+//             ? 'Reported photo removed by moderator.'
+//             : 'Reported photo removed by moderator.\n\n'
+//                 '${adminNotes.trim()}';
+
+//     final updates = <String, dynamic>{
+//       'status': 'action_taken',
+//       'reviewed_by': user.id,
+//       'reviewed_at': completedAt,
+//       'admin_notes': finalNotes,
+//     };
+
+//     await supabase
+//         .from('Content_Reports')
+//         .update(updates)
+//         .eq('id', reportId);
+
+//     if (!mounted) {
+//       return true;
+//     }
+
+//     setState(() {
+//       currentReport = {
+//         ...currentReport,
+//         ...updates,
+//       };
+
+//       reportedContent = null;
+//       isUpdatingReport = false;
+//     });
+
+//     return true;
+//   } on PostgrestException catch (e) {
+//     debugPrint(
+//       'REMOVE REPORTED PHOTO ERROR: '
+//       '${e.message}',
+//     );
+
+//     if (!mounted) {
+//       return false;
+//     }
+
+//     setState(() {
+//       isUpdatingReport = false;
+//     });
+
+//     ScaffoldMessenger.of(context).showSnackBar(
+//       SnackBar(
+//         content: Text(
+//           'Unable to remove the reported photo: '
+//           '${e.message}',
+//         ),
+//       ),
+//     );
+
+//     return false;
+//   } catch (e) {
+//     debugPrint(
+//       'REMOVE REPORTED PHOTO ERROR: $e',
+//     );
+
+//     if (!mounted) {
+//       return false;
+//     }
+
+//     setState(() {
+//       isUpdatingReport = false;
+//     });
+
+//     ScaffoldMessenger.of(context).showSnackBar(
+//       const SnackBar(
+//         content: Text(
+//           'Unable to remove the reported photo.',
+//         ),
+//       ),
+//     );
+
+//     return false;
+//   }
+// }
+
+Future<bool> removeReportedPhoto({
   required String adminNotes,
 }) async {
   if (isUpdatingReport) {
@@ -561,18 +661,10 @@ class _ModerationReportDetailsPageState
   final reportId =
       currentReport['id']?.toString() ?? '';
 
-  final contentId =
-      currentReport['content_id']
-              ?.toString() ??
-          '';
-
   final contentType =
-      currentReport['content_type']
-              ?.toString() ??
-          '';
+      currentReport['content_type']?.toString() ?? '';
 
   if (reportId.isEmpty ||
-      contentId.isEmpty ||
       contentType != 'photo') {
     return false;
   }
@@ -582,62 +674,37 @@ class _ModerationReportDetailsPageState
   });
 
   try {
-    // Delete ONLY the reported Photos database row.
-    //
-    // Do not delete the underlying Storage object here.
-    // The same image may also be referenced by a
-    // Milestone.
-    await supabase
-        .from('Photos')
-        .delete()
-        .eq('id', contentId);
+    await supabase.rpc(
+      'moderate_reported_content',
+      params: {
+        'p_report_id': reportId,
+        'p_admin_notes':
+            adminNotes.trim().isEmpty
+                ? null
+                : adminNotes.trim(),
+      },
+    );
 
-    // Confirm the Photos row is actually gone before
-    // recording a successful moderation action.
-    final remainingPhoto = await supabase
-        .from('Photos')
-        .select('id')
-        .eq('id', contentId)
-        .maybeSingle();
-
-    if (remainingPhoto != null) {
-      throw Exception(
-        'Reported photo still exists after deletion.',
-      );
+    if (!mounted) {
+      return true;
     }
 
-    final completedAt =
-        DateTime.now()
-            .toUtc()
-            .toIso8601String();
-
-    final finalNotes =
-        adminNotes.trim().isEmpty
-            ? 'Reported photo removed by moderator.'
-            : 'Reported photo removed by moderator.\n\n'
-                '${adminNotes.trim()}';
-
-    final updates = <String, dynamic>{
-      'status': 'action_taken',
-      'reviewed_by': user.id,
-      'reviewed_at': completedAt,
-      'admin_notes': finalNotes,
-    };
-
-    await supabase
-        .from('Content_Reports')
-        .update(updates)
-        .eq('id', reportId);
+    final refreshedReport =
+        await supabase
+            .from('Content_Reports')
+            .select()
+            .eq('id', reportId)
+            .single();
 
     if (!mounted) {
       return true;
     }
 
     setState(() {
-      currentReport = {
-        ...currentReport,
-        ...updates,
-      };
+      currentReport =
+          Map<String, dynamic>.from(
+        refreshedReport,
+      );
 
       reportedContent = null;
       isUpdatingReport = false;
@@ -646,7 +713,7 @@ class _ModerationReportDetailsPageState
     return true;
   } on PostgrestException catch (e) {
     debugPrint(
-      'REMOVE REPORTED PHOTO ERROR: '
+      'REMOVE REPORTED PHOTO RPC ERROR: '
       '${e.message}',
     );
 
@@ -658,7 +725,8 @@ class _ModerationReportDetailsPageState
       isUpdatingReport = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
       SnackBar(
         content: Text(
           'Unable to remove the reported photo: '
@@ -670,7 +738,7 @@ class _ModerationReportDetailsPageState
     return false;
   } catch (e) {
     debugPrint(
-      'REMOVE REPORTED PHOTO ERROR: $e',
+      'REMOVE REPORTED PHOTO RPC ERROR: $e',
     );
 
     if (!mounted) {
@@ -681,7 +749,8 @@ class _ModerationReportDetailsPageState
       isUpdatingReport = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
       const SnackBar(
         content: Text(
           'Unable to remove the reported photo.',
@@ -709,18 +778,10 @@ class _ModerationReportDetailsPageState
   final reportId =
       currentReport['id']?.toString() ?? '';
 
-  final contentId =
-      currentReport['content_id']
-              ?.toString() ??
-          '';
-
   final contentType =
-      currentReport['content_type']
-              ?.toString() ??
-          '';
+      currentReport['content_type']?.toString() ?? '';
 
   if (reportId.isEmpty ||
-      contentId.isEmpty ||
       contentType != 'photo_comment') {
     return false;
   }
@@ -730,58 +791,37 @@ class _ModerationReportDetailsPageState
   });
 
   try {
-    // Delete only the exact reported photo comment.
-    await supabase
-        .from('Photo_Comments')
-        .delete()
-        .eq('id', contentId);
+    await supabase.rpc(
+      'moderate_reported_content',
+      params: {
+        'p_report_id': reportId,
+        'p_admin_notes':
+            adminNotes.trim().isEmpty
+                ? null
+                : adminNotes.trim(),
+      },
+    );
 
-    // Confirm that the reported comment is actually gone
-    // before recording a successful moderation action.
-    final remainingComment = await supabase
-        .from('Photo_Comments')
-        .select('id')
-        .eq('id', contentId)
-        .maybeSingle();
-
-    if (remainingComment != null) {
-      throw Exception(
-        'Reported photo comment still exists after deletion.',
-      );
+    if (!mounted) {
+      return true;
     }
 
-    final completedAt =
-        DateTime.now()
-            .toUtc()
-            .toIso8601String();
-
-    final finalNotes =
-        adminNotes.trim().isEmpty
-            ? 'Reported photo comment removed by moderator.'
-            : 'Reported photo comment removed by moderator.\n\n'
-                '${adminNotes.trim()}';
-
-    final updates = <String, dynamic>{
-      'status': 'action_taken',
-      'reviewed_by': user.id,
-      'reviewed_at': completedAt,
-      'admin_notes': finalNotes,
-    };
-
-    await supabase
-        .from('Content_Reports')
-        .update(updates)
-        .eq('id', reportId);
+    final refreshedReport =
+        await supabase
+            .from('Content_Reports')
+            .select()
+            .eq('id', reportId)
+            .single();
 
     if (!mounted) {
       return true;
     }
 
     setState(() {
-      currentReport = {
-        ...currentReport,
-        ...updates,
-      };
+      currentReport =
+          Map<String, dynamic>.from(
+        refreshedReport,
+      );
 
       reportedContent = null;
       isUpdatingReport = false;
@@ -790,7 +830,7 @@ class _ModerationReportDetailsPageState
     return true;
   } on PostgrestException catch (e) {
     debugPrint(
-      'REMOVE REPORTED PHOTO COMMENT ERROR: '
+      'REMOVE REPORTED PHOTO COMMENT RPC ERROR: '
       '${e.message}',
     );
 
@@ -802,11 +842,12 @@ class _ModerationReportDetailsPageState
       isUpdatingReport = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
       SnackBar(
         content: Text(
-          'Unable to remove the reported '
-          'photo comment: ${e.message}',
+          'Unable to remove the reported photo comment: '
+          '${e.message}',
         ),
       ),
     );
@@ -814,7 +855,7 @@ class _ModerationReportDetailsPageState
     return false;
   } catch (e) {
     debugPrint(
-      'REMOVE REPORTED PHOTO COMMENT ERROR: $e',
+      'REMOVE REPORTED PHOTO COMMENT RPC ERROR: $e',
     );
 
     if (!mounted) {
@@ -825,7 +866,8 @@ class _ModerationReportDetailsPageState
       isUpdatingReport = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
       const SnackBar(
         content: Text(
           'Unable to remove the reported photo comment.',
@@ -1451,64 +1493,58 @@ class _ModerationReportDetailsPageState
   );
 }
 
-  Future<bool> updateReportStatus({required String newStatus, String? adminNotes}) async {
-    if (isUpdatingReport) {
-      return false;
+  Future<bool> startReportReview() async {
+  if (isUpdatingReport) {
+    return false;
+  }
+
+  final user = supabase.auth.currentUser;
+
+  if (user == null) {
+    return false;
+  }
+
+  final reportId =
+      currentReport['id']?.toString() ?? '';
+
+  if (reportId.isEmpty) {
+    return false;
+  }
+
+  setState(() {
+    isUpdatingReport = true;
+  });
+
+  try {
+    await supabase.rpc(
+      'update_moderation_report_status',
+      params: {
+        'p_report_id': reportId,
+        'p_action': 'start_review',
+        'p_admin_notes': null,
+      },
+    );
+
+    if (!mounted) {
+      return true;
     }
 
-    final user = supabase.auth.currentUser;
-
-    if (user == null) {
-      return false;
-    }
-
-    final reportId = currentReport['id']?.toString();
-
-    if (reportId == null || reportId.isEmpty) {
-      return false;
-    }
-
-    setState(() {
-      isUpdatingReport = true;
-    });
-
-    try {
-      final updates = <String, dynamic>{
-        'status': newStatus,
-      };
-
-    // Starting review records who began
-    // reviewing the report.
-      if (newStatus == 'under_review') {
-        updates['reviewed_by'] = user.id;
-        updates['reviewed_at'] = DateTime.now().toUtc().toIso8601String();
-      }
-
-    // A final moderation decision also records
-    // the reviewing admin and completion time.
-    if (newStatus == 'dismissed' || newStatus == 'action_taken') {
-      updates['reviewed_by'] = user.id;
-      updates['reviewed_at'] = DateTime.now().toUtc().toIso8601String();
-
-      if (adminNotes != null && adminNotes.trim().isNotEmpty) {
-        updates['admin_notes'] = adminNotes.trim();
-      }
-    }
-
-    await supabase
-        .from('Content_Reports')
-        .update(updates)
-        .eq('id', reportId);
+    final refreshedReport =
+        await supabase
+            .from('Content_Reports')
+            .select()
+            .eq('id', reportId)
+            .single();
 
     if (!mounted) {
       return true;
     }
 
     setState(() {
-      currentReport = {
-        ...currentReport,
-        ...updates,
-      };
+      currentReport =
+          Map<String, dynamic>.from(
+        refreshedReport,
+      );
 
       isUpdatingReport = false;
     });
@@ -1516,7 +1552,7 @@ class _ModerationReportDetailsPageState
     return true;
   } on PostgrestException catch (e) {
     debugPrint(
-      'UPDATE MODERATION REPORT ERROR: '
+      'START REPORT REVIEW RPC ERROR: '
       '${e.message}',
     );
 
@@ -1528,11 +1564,10 @@ class _ModerationReportDetailsPageState
       isUpdatingReport = false;
     });
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      const SnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
         content: Text(
-          'Unable to update this report.',
+          'Unable to start review: ${e.message}',
         ),
       ),
     );
@@ -1540,7 +1575,7 @@ class _ModerationReportDetailsPageState
     return false;
   } catch (e) {
     debugPrint(
-      'UPDATE MODERATION REPORT ERROR: $e',
+      'START REPORT REVIEW RPC ERROR: $e',
     );
 
     if (!mounted) {
@@ -1551,11 +1586,10 @@ class _ModerationReportDetailsPageState
       isUpdatingReport = false;
     });
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
-          'Unable to update this report.',
+          'Unable to start review.',
         ),
       ),
     );
@@ -1564,11 +1598,123 @@ class _ModerationReportDetailsPageState
   }
 }
 
-  Future<void> showDecisionDialog({
+
+
+  Future<bool> dismissReport({
+  required String adminNotes,
+}) async {
+  if (isUpdatingReport) {
+    return false;
+  }
+
+  final user = supabase.auth.currentUser;
+
+  if (user == null) {
+    return false;
+  }
+
+  final reportId =
+      currentReport['id']?.toString() ?? '';
+
+  if (reportId.isEmpty) {
+    return false;
+  }
+
+  setState(() {
+    isUpdatingReport = true;
+  });
+
+  try {
+    await supabase.rpc(
+      'update_moderation_report_status',
+      params: {
+        'p_report_id': reportId,
+        'p_action': 'dismiss',
+        'p_admin_notes':
+            adminNotes.trim().isEmpty
+                ? null
+                : adminNotes.trim(),
+      },
+    );
+
+    if (!mounted) {
+      return true;
+    }
+
+    final refreshedReport =
+        await supabase
+            .from('Content_Reports')
+            .select()
+            .eq('id', reportId)
+            .single();
+
+    if (!mounted) {
+      return true;
+    }
+
+    setState(() {
+      currentReport =
+          Map<String, dynamic>.from(
+        refreshedReport,
+      );
+
+      isUpdatingReport = false;
+    });
+
+    return true;
+  } on PostgrestException catch (e) {
+    debugPrint(
+      'DISMISS REPORT RPC ERROR: ${e.message}',
+    );
+
+    if (!mounted) {
+      return false;
+    }
+
+    setState(() {
+      isUpdatingReport = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Unable to dismiss report: ${e.message}',
+        ),
+      ),
+    );
+
+    return false;
+  } catch (e) {
+    debugPrint(
+      'DISMISS REPORT RPC ERROR: $e',
+    );
+
+    if (!mounted) {
+      return false;
+    }
+
+    setState(() {
+      isUpdatingReport = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Unable to dismiss this report.',
+        ),
+      ),
+    );
+
+    return false;
+  }
+}
+
+Future<void> showDecisionDialog({
   required String decision,
 }) async {
-  final isDismissal =
-      decision == 'dismissed';
+  if (decision != 'dismissed') {
+    return;
+  }
 
   final existingNotes =
       currentReport['admin_notes']
@@ -1588,11 +1734,9 @@ class _ModerationReportDetailsPageState
           borderRadius:
               BorderRadius.circular(22),
         ),
-        title: Text(
-          isDismissal
-              ? 'Dismiss report?'
-              : 'Record action taken?',
-          style: const TextStyle(
+        title: const Text(
+          'Dismiss report?',
+          style: TextStyle(
             color:
                 FolktriColors.midnightIndigo,
             fontWeight: FontWeight.w700,
@@ -1603,13 +1747,10 @@ class _ModerationReportDetailsPageState
           crossAxisAlignment:
               CrossAxisAlignment.start,
           children: [
-            Text(
-              isDismissal
-                  ? 'This will close the report as dismissed.'
-                  : 'This records that moderation action was taken. '
-                      'It does not automatically suspend the user '
-                      'or delete their content.',
-              style: const TextStyle(
+            const Text(
+              'This will close the report as dismissed. '
+              'The reported content will remain in Folktri.',
+              style: TextStyle(
                 color:
                     FolktriColors.secondaryText,
                 fontSize: 13.5,
@@ -1663,16 +1804,10 @@ class _ModerationReportDetailsPageState
             style:
                 FilledButton.styleFrom(
               backgroundColor:
-                  isDismissal
-                      ? FolktriColors
-                          .secondaryText
-                      : FolktriColors
-                          .connectionTeal,
+                  FolktriColors.secondaryText,
             ),
-            child: Text(
-              isDismissal
-                  ? 'Dismiss'
-                  : 'Record Action',
+            child: const Text(
+              'Dismiss',
             ),
           ),
         ],
@@ -1686,8 +1821,7 @@ class _ModerationReportDetailsPageState
   }
 
   final success =
-      await updateReportStatus(
-    newStatus: decision,
+      await dismissReport(
     adminNotes: draftNotes.trim(),
   );
 
@@ -1697,11 +1831,9 @@ class _ModerationReportDetailsPageState
 
   ScaffoldMessenger.of(context)
       .showSnackBar(
-    SnackBar(
+    const SnackBar(
       content: Text(
-        isDismissal
-            ? 'Report dismissed.'
-            : 'Moderation action recorded.',
+        'Report dismissed.',
       ),
     ),
   );
@@ -2600,14 +2732,9 @@ if (contentType == 'photo') {
             onPressed: isUpdatingReport
                 ? null
                 : () async {
-                    final success =
-                        await updateReportStatus(
-                      newStatus:
-                          'under_review',
-                    );
+                    final success = await startReportReview();
 
-                    if (!success ||
-                        !mounted) {
+                    if (!success || !mounted) {
                       return;
                     }
 
