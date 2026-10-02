@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../Styling/folktri_colors.dart';
-//import 'package:google_fonts/google_fonts.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class FamilyCalendarPage extends StatefulWidget {
   final String familyId;
@@ -2399,21 +2399,13 @@ Future<void> loadChildren() async {
         elevation: 0,
         automaticallyImplyLeading: false,
 
-        // leading: IconButton(
-        //   tooltip: 'Back to family',
-        //   icon: const Icon(
-        //     Icons
-        //         .arrow_back_ios_new_rounded,
-        //   ),
-        //   onPressed: () {
-        //     context.go(
-        //       '/family/${widget.familyId}',
-        //     );
-        //   },
-        // ),
-
-        title: const Text(
+        title: Text(
           'Family Calendar',
+          style: GoogleFonts.poppins(
+            color:
+                FolktriColors.surface,
+            fontWeight: FontWeight.w600,
+          ),
         ),
 
         centerTitle: true,
@@ -2477,8 +2469,21 @@ Future<void> loadChildren() async {
 
       // ALBUMS
       case 3:
-        // We'll connect this when
-        // Family Albums is built.
+        final familyId = selectedFamilyId;
+
+        if (familyId != null) {
+          context.go(
+            '/family/$familyId/albums',
+          );
+        } else {
+          ScaffoldMessenger.of(context)
+            .showSnackBar(
+          const SnackBar(
+            content: Text('Please create or join a family first.',),
+      ),
+    );
+  }
+        
         break;
 
       // PROFILE

@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../Styling/folktri_colors.dart';
-//import 'package:google_fonts/google_fonts.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class FamiliesPage extends StatefulWidget {
   const FamiliesPage({super.key});
@@ -310,23 +310,15 @@ class _FamiliesPageState extends State<FamiliesPage> {
         foregroundColor: FolktriColors.surface,
         elevation: 0,
         automaticallyImplyLeading: false,
-        title:  Text(
+        title: Text(
           'Families',
-          // style: GoogleFonts.marckScript(
-          //   fontSize: 22,
-          //   fontWeight: FontWeight.w600,
-          //   color: FolktriColors.surface,
-          // ),
+          style: GoogleFonts.poppins(
+            color:
+                FolktriColors.surface,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        // leading: IconButton(
-        //   tooltip: 'Back to dashboard',
-        //   icon: const Icon(
-        //     Icons.arrow_back_ios_new_rounded,
-        //   ),
-        //   onPressed: () {
-        //     context.go('/app');
-        //   },
-        // ),
+        centerTitle: true,
       ),
 
       body: RefreshIndicator(
@@ -449,7 +441,6 @@ class _FamiliesPageState extends State<FamiliesPage> {
 
             // CALENDAR
             case 1:
-              // Already on Calendar.
               context.go('/family/:familyId/calendar');
               break;
 
@@ -460,9 +451,44 @@ class _FamiliesPageState extends State<FamiliesPage> {
 
             // ALBUMS
             case 3:
-              // We'll connect this when
-              // Family Albums is built.
-              break;
+              if (families.isEmpty) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Please create or join a family first.',
+        ),
+      ),
+    );
+    break;
+  }
+
+  if (families.length == 1) {
+    final familyId =
+        families.first['id']
+                ?.toString() ??
+            '';
+
+    if (familyId.isNotEmpty) {
+      context.go(
+        '/family/$familyId/albums',
+      );
+    }
+
+    break;
+  }
+
+  ScaffoldMessenger.of(context)
+      .showSnackBar(
+    const SnackBar(
+      content: Text(
+        'Select a family first.',
+      ),
+    ),
+  );
+
+        
+        break;
 
             // PROFILE
             case 4:

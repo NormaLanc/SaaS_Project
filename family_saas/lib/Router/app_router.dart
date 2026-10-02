@@ -33,6 +33,9 @@ import '../Pages/App/Settings/member_permissions.dart';
 import '../Pages/App/Settings/privacy.dart';
 import '../Pages/App/Admin/moderation_reports.dart';
 import '../Pages/App/Admin/moderation_report_details.dart';
+import '../Pages/App/Album/album_page.dart';
+import '../Pages/App/Album/create_album.dart';
+import '../Pages/App/Album/view_album.dart';
 
 final GoRouter appRouter = GoRouter(
   // initialLocation: kIsWeb ? '/' : '/welcome',
@@ -334,6 +337,45 @@ GoRoute(
 
     return MemberPermissionsPage(
       membershipId: membershipId,
+    );
+  },
+),
+GoRoute(
+  path: '/family/:familyId/albums',
+  builder: (context, state) {
+    final familyId =
+        state.pathParameters[
+            'familyId']!;
+
+    return AlbumPage(
+      familyId: familyId,
+    );
+  },
+),
+GoRoute(
+  path: '/family/:familyId/albums/create',
+  builder: (context, state) {
+    final familyId =
+        state.pathParameters['familyId']!;
+
+    return CreateAlbumPage(
+      familyId: familyId,
+    );
+  },
+),
+GoRoute(
+  path: '/family/:familyId/albums/:albumId',
+  builder: (context, state) {
+    final albumId =
+        state.pathParameters['albumId']!;
+
+    final albumName =
+        state.uri.queryParameters['name'] ??
+            'Album';
+
+    return ViewAlbumPage(
+      albumId: albumId,
+      albumName: albumName,
     );
   },
 ),

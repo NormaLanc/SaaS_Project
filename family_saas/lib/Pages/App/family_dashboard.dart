@@ -3407,11 +3407,23 @@ Future<void> showFamilyPostComments(
                 .trim() ??
             '';
 
-            final displayName = [firstName, lastName,]
-              .where(
-                (name) => name.isNotEmpty,
-              )
-              .join(' ');
+            final fullName = [
+              firstName,
+              lastName,
+            ]
+            .where((name) => name.isNotEmpty)
+            .join(' ');
+
+            final displayName =
+              fullName.isEmpty
+                ? 'Deleted User'
+                : fullName;
+
+            // final displayName = [firstName, lastName,]
+            //   .where(
+            //     (name) => name.isNotEmpty,
+            //   )
+            //   .join(' ');
 
   final signedPhotoUrl =
       profile?['signed_photo_url']
@@ -5609,7 +5621,7 @@ Widget buildPhotoCommentThread({
 
   final safeDisplayName =
       displayName.isEmpty
-          ? 'Family member'
+          ? 'Deleted User'
           : displayName;
 
   return Column(
@@ -5763,7 +5775,7 @@ Widget buildPhotoCommentTile({
 
   final displayName =
       fullName.isEmpty
-          ? 'Family member'
+          ? 'Deleted User'
           : fullName;
 
   final commentText =
@@ -9659,15 +9671,21 @@ Widget _todayCard({
         break;
 
       case 3:
-        // Open family albums.
-        // Add this route when your Albums page is ready.
-        ScaffoldMessenger.of(context).showSnackBar(
+        final familyId = selectedFamilyId;
+
+        if (familyId != null) {
+          context.go(
+            '/family/$familyId/albums',
+          );
+        } else {
+          ScaffoldMessenger.of(context)
+            .showSnackBar(
           const SnackBar(
-            content: Text(
-              'Family Albums is coming soon!',
-            ),
-          ),
-        );
+            content: Text('Please create or join a family first.',),
+      ),
+    );
+  }
+        
         break;
 
       case 4:
