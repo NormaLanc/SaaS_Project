@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import '../Services/auth_service.dart';
-//import '../Pages/create_account.dart';
-//import '../Pages/App/family_dashboard.dart';
 import '../Pages/Styling/folktri_colors.dart';
 import 'package:go_router/go_router.dart';
 

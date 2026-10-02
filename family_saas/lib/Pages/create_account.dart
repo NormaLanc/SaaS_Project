@@ -21,6 +21,8 @@ class _RegisterPageState extends State<RegisterPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
+  DateTime? selectedDateOfBirth;
+
   final authService = AuthService();
 
   bool _obscurePassword = true;
@@ -35,6 +37,18 @@ class _RegisterPageState extends State<RegisterPage> {
     passwordController.dispose();
     super.dispose();
   }
+
+  bool isAtLeast13(DateTime dateOfBirth) {
+  final today = DateTime.now();
+
+  final thirteenthBirthday = DateTime(
+    dateOfBirth.year + 13,
+    dateOfBirth.month,
+    dateOfBirth.day,
+  );
+
+  return !today.isBefore(thirteenthBirthday);
+}
 
   Future<void> register() async {
     if (_isLoading) return;
@@ -68,6 +82,7 @@ class _RegisterPageState extends State<RegisterPage> {
         firstName: firstNameController.text.trim(),
         lastName: lastNameController.text.trim(),
         phoneNumber: phoneController.text.trim(),
+        dateOfBirth: selectedDateOfBirth!,
       );
 
       // 3. Preserve your existing sign-out flow.
@@ -350,6 +365,90 @@ class _RegisterPageState extends State<RegisterPage> {
 
                         const SizedBox(height: 14),
 
+// Date of birth
+FormField<DateTime>(
+  validator: (_) {
+    if (selectedDateOfBirth == null) {
+      return 'Please enter your date of birth.';
+    }
+
+    if (!isAtLeast13(selectedDateOfBirth!)) {
+      return 'You must be at least 13 years old to create a Folktri account.';
+    }
+
+    return null;
+  },
+  builder: (field) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: _isLoading
+              ? null
+              : () async {
+                  final today = DateTime.now();
+
+                  final pickedDate =
+                      await showDatePicker(
+                    context: context,
+                    initialDate:
+                        selectedDateOfBirth ??
+                            DateTime(
+                              today.year - 18,
+                              today.month,
+                              today.day,
+                            ),
+                    firstDate:
+                        DateTime(today.year - 120),
+                    lastDate: today,
+                    helpText: 'Select your date of birth',
+                  );
+
+                  if (pickedDate == null) {
+                    return;
+                  }
+
+                  setState(() {
+                    selectedDateOfBirth =
+                        pickedDate;
+                  });
+
+                  field.didChange(pickedDate);
+                },
+          child: InputDecorator(
+            decoration: _inputDecoration(
+              hint: 'Date of birth',
+              icon:
+                  Icons.cake_outlined,
+            ).copyWith(
+              errorText: field.errorText,
+            ),
+            child: Text(
+              selectedDateOfBirth == null
+                  ? 'Date of birth'
+                  : '${selectedDateOfBirth!.month}/'
+                      '${selectedDateOfBirth!.day}/'
+                      '${selectedDateOfBirth!.year}',
+              style: TextStyle(
+                color:
+                    selectedDateOfBirth == null
+                        ? FolktriColors
+                            .secondaryText
+                        : FolktriColors
+                            .primaryText,
+                fontSize: 15,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  },
+),
+
+                        const SizedBox(height: 14),
+
                         // Phone number
                         TextFormField(
                           controller: phoneController,
@@ -548,180 +647,3 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 }
-
-
-// import 'package:flutter/material.dart';
-// import '../Services/auth_service.dart';
-// import 'package:go_router/go_router.dart';
-
-// class RegisterPage extends StatefulWidget {
-//   const RegisterPage({super.key});
-
-
-//   @override
-//   State<RegisterPage> createState() => _RegisterPageState();
-// }
-
-
-// class _RegisterPageState extends State<RegisterPage> {
-
-//   final firstNameController = TextEditingController();
-//   final lastNameController = TextEditingController();
-//   final phoneController = TextEditingController();
-
-//   final emailController = TextEditingController();
-//   final passwordController = TextEditingController();
-
-//   final authService = AuthService();
-
-// void register() async {
-
-//     try {
-
-//       final response = await authService.signUp(
-//         emailController.text.trim(),
-//         passwordController.text.trim(),
-//       );
-
-
-//       final user = response.user;
-
-
-//       if (user != null) {
-
-//         await authService.createProfile(
-//           userId: user.id,
-//           firstName: firstNameController.text.trim(),
-//           lastName: lastNameController.text.trim(),
-//           phoneNumber: phoneController.text.trim(),
-//         );
-
-//       }
-
-
-//       if (!mounted) return;
-
-// ScaffoldMessenger.of(context).showSnackBar(
-//   const SnackBar(
-//     content: Text(
-//       "Account Successfully Created!",
-//     ),
-//   ),
-// );
-//     await authService.signOut();
-//     context.go('/login');
-
-
-//     } catch(e) {
-
-//       debugPrint('REGISTRATION ERROR: $e');
-
-//     if (!mounted) return;
-
-//     ScaffoldMessenger.of(context).showSnackBar(
-//       SnackBar(
-//         content: Text(
-//           'Unable to create account: $e',
-//         ),
-//       ),
-//     );
-//     }
-//   }
-//   // void register() async {
-
-//   //   try {
-
-//   //     await authService.signUp(
-//   //       emailController.text.trim(),
-//   //       passwordController.text.trim(),
-//   //     );
-
-
-//   //     ScaffoldMessenger.of(context).showSnackBar(
-//   //       const SnackBar(
-//   //         content: Text("Account created!"),
-//   //       ),
-//   //     );
-
-
-//   //   } catch(e){
-
-//   //     ScaffoldMessenger.of(context).showSnackBar(
-//   //       SnackBar(
-//   //         content: Text(e.toString()),
-//   //       ),
-//   //     );
-
-//   //   }
-
-//   // }
-
-
-//   @override
-//   Widget build(BuildContext context){
-
-//     return Scaffold(
-//     //TODO: Update UI for this page.
-//       appBar: AppBar(
-//         title: const Text("Create Family Account"),
-//       ),
-
-
-//       body: Padding(
-
-//         padding: const EdgeInsets.all(20),
-
-//         child: Column(
-
-//           children: [
-
-//             TextField(
-//               controller: firstNameController,
-//               decoration: const InputDecoration(
-//               labelText: "First Name",
-//             ),
-//           ),
-
-//             TextField(
-//               controller: lastNameController,
-//               decoration: const InputDecoration(
-//               labelText: "Last Name",
-//             ),
-//           ),
-
-//             TextField(
-//               controller: phoneController,
-//               keyboardType: TextInputType.phone,
-//               decoration: const InputDecoration(
-//               labelText: "Phone Number",
-//             ),
-//           ),
-
-//             TextField(
-//               controller: emailController,
-//               decoration: const InputDecoration(
-//                 labelText: "Email",
-//               ),
-//             ),
-
-
-//             TextField(
-//               controller: passwordController,
-//               obscureText: true,
-//               decoration: const InputDecoration(
-//                 labelText: "Password",
-//               ),
-//             ),
-
-
-//             ElevatedButton(
-//               onPressed: register,
-//               child: const Text("Create Account"),
-//             )
-
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-// }

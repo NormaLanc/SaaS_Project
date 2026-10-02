@@ -22,6 +22,7 @@ class AuthService {
     required String firstName,
     required String lastName,
     required String phoneNumber,
+    required DateTime dateOfBirth,
   }) async {
 
     await supabase
@@ -32,6 +33,10 @@ class AuthService {
       'first_name': firstName,
       'last_name': lastName,
       'phone_number': phoneNumber,
+      'date_of_birth':  
+      '${dateOfBirth.year.toString().padLeft(4, '0')}-'
+        '${dateOfBirth.month.toString().padLeft(2, '0')}-'
+        '${dateOfBirth.day.toString().padLeft(2, '0')}',
 
     });
 
