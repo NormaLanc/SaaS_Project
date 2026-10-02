@@ -294,17 +294,21 @@ class _AlbumPageState extends State<AlbumPage> {
               // We'll connect this to
               // the individual album
               // page next.
-              onTap: () {
+              onTap: () async {
                 final albumId = album['id']?.toString() ?? '';
 
                 if (albumId.isEmpty) {
                   return;
                 }
 
-                context.push(
+                final deleted = await context.push<bool>(
                   '/family/${widget.familyId}/albums/$albumId'
                   '?name=${Uri.encodeComponent(albumName)}',
                 );
+
+                if (deleted == true && mounted) {
+                  await loadAlbums();
+                }
               },
 
               child: Column(

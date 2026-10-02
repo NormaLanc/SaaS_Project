@@ -36,6 +36,7 @@ import '../Pages/App/Admin/moderation_report_details.dart';
 import '../Pages/App/Album/album_page.dart';
 import '../Pages/App/Album/create_album.dart';
 import '../Pages/App/Album/view_album.dart';
+import '../Pages/App/Album/album_photo_viewer.dart';
 
 final GoRouter appRouter = GoRouter(
   // initialLocation: kIsWeb ? '/' : '/welcome',
@@ -379,5 +380,32 @@ GoRoute(
     );
   },
 ),
+GoRoute(
+  path:
+      '/family/:familyId/albums/:albumId/photo',
+  builder: (context, state) {
+    final albumId =
+        state.pathParameters['albumId']!;
+
+    final extra =
+        state.extra
+            as Map<String, dynamic>;
+
+    final photos =
+        List<Map<String, dynamic>>.from(
+      extra['photos'] as List,
+    );
+
+    final initialIndex =
+        extra['initialIndex'] as int;
+
+    return AlbumPhotoViewerPage(
+      albumId: albumId,
+      photos: photos,
+      initialIndex: initialIndex,
+    );
+  },
+),
+
   ],
 );
