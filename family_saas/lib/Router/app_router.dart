@@ -406,6 +406,25 @@ GoRoute(
     );
   },
 ),
+GoRoute(
+  path: '/all-photos/view',
+  builder: (context, state) {
+    final extra =
+        state.extra as Map<String, dynamic>;
 
+    final photos =
+        List<Map<String, dynamic>>.from(
+      extra['photos'] as List,
+    );
+
+    final initialIndex =
+        extra['initialIndex'] as int;
+
+    return AlbumPhotoViewerPage(
+      photos: photos,
+      initialIndex: initialIndex,
+    );
+  },
+),
   ],
 );

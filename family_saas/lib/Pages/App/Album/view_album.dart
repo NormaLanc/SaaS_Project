@@ -19,14 +19,14 @@ class ViewAlbumPage extends StatefulWidget {
       _ViewAlbumPageState();
 }
 
-class _ViewAlbumPageState
-    extends State<ViewAlbumPage> {
-  final supabase =
-      Supabase.instance.client;
+class _ViewAlbumPageState extends State<ViewAlbumPage> {
+  final supabase = Supabase.instance.client;
 
   List<Map<String, dynamic>> photos = [];
 
   bool isLoading = true;
+
+  bool albumChanged = false;
 
   @override
   void initState() {
@@ -221,6 +221,15 @@ class _ViewAlbumPageState
         elevation: 0,
         centerTitle: true,
 
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+          ),
+          onPressed: () {
+            context.pop(albumChanged);
+          },
+        ),
+
         title: Text(
           widget.albumName,
           maxLines: 1,
@@ -327,6 +336,8 @@ class _ViewAlbumPageState
                                   );
 
                               if (changed == true && mounted) {
+                                albumChanged = true;
+
                                 await loadAlbumPhotos();
                               }
                             },

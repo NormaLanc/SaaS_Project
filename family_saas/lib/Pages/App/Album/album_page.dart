@@ -146,6 +146,372 @@ class _AlbumPageState extends State<AlbumPage> {
   }
 }
 
+  Future<void> addPhotoToAlbum({
+  required String photoId,
+  required String albumId,
+  required String albumName,
+}) async {
+  try {
+    final user =
+        supabase.auth.currentUser;
+
+    if (user == null) {
+      return;
+    }
+
+    // Check whether this photo is
+    // already in this album.
+    final existing = await supabase
+        .from('Photo_Album_Items')
+        .select('id')
+        .eq(
+          'album_id',
+          albumId,
+        )
+        .eq(
+          'photo_id',
+          photoId,
+        )
+        .maybeSingle();
+
+    if (existing != null) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: Text(
+            'This photo is already in '
+            '$albumName.',
+          ),
+        ),
+      );
+
+      return;
+    }
+
+    await supabase
+        .from('Photo_Album_Items')
+        .insert({
+      'album_id': albumId,
+      'photo_id': photoId,
+      'added_by': user.id,
+    });
+
+    await loadAlbums();
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(
+          'Added to $albumName.',
+        ),
+      ),
+    );
+  } catch (e) {
+    debugPrint(
+      'ADD PHOTO TO ALBUM ERROR: $e',
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Unable to add photo to album.',
+        ),
+      ),
+    );
+  }
+}
+
+  Future<void> deletePhoto(
+  Map<String, dynamic> photo,
+) async {
+  final photoId =
+      photo['id']?.toString() ?? '';
+
+  final photoUrl =
+      photo['photo_url']
+              ?.toString()
+              .trim() ??
+          '';
+
+  if (photoId.isEmpty) {
+    return;
+  }
+
+  final shouldDelete =
+      await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text(
+          'Delete photo?',
+        ),
+        content: const Text(
+          'This photo will be permanently deleted '
+          'from Folktri and removed from any albums '
+          'that contain it. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(
+                dialogContext,
+              ).pop(false);
+            },
+            child: const Text(
+              'Cancel',
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(
+                dialogContext,
+              ).pop(true);
+            },
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                color: Colors.red,
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (shouldDelete != true) {
+    return;
+  }
+
+  try {
+    // Delete the database row first.
+    //
+    // Photo_Album_Items.photo_id uses
+    // ON DELETE CASCADE, so Supabase will
+    // automatically remove this photo from
+    // every album containing it.
+    await supabase
+        .from('Photos')
+        .delete()
+        .eq(
+          'id',
+          photoId,
+        );
+
+    // Attempt to remove the actual image
+    // from the family_photos Storage bucket.
+    if (photoUrl.isNotEmpty) {
+      try {
+        final uri =
+            Uri.parse(photoUrl);
+
+        const marker =
+            '/family_photos/';
+
+        final markerIndex =
+            uri.path.indexOf(marker);
+
+        if (markerIndex != -1) {
+          final storagePath =
+              Uri.decodeComponent(
+            uri.path.substring(
+              markerIndex +
+                  marker.length,
+            ),
+          );
+
+          if (storagePath.isNotEmpty) {
+            await supabase.storage
+                .from('family_photos')
+                .remove([
+              storagePath,
+            ]);
+          }
+        }
+      } catch (storageError) {
+        debugPrint(
+          'DELETE PHOTO STORAGE ERROR: '
+          '$storageError',
+        );
+      }
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    // Reload All Photos.
+    await loadPhotos();
+
+    // Reload albums so their cover/count
+    // immediately reflects the deletion.
+    await loadAlbums();
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Photo deleted.',
+        ),
+      ),
+    );
+  } catch (e) {
+    debugPrint(
+      'DELETE PHOTO ERROR: $e',
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Unable to delete photo.',
+        ),
+      ),
+    );
+  }
+}
+
+  Future<void> showAddToAlbumDialog(
+  Map<String, dynamic> photo,
+) async {
+  final photoId =
+      photo['id']?.toString() ?? '';
+
+  if (photoId.isEmpty) {
+    return;
+  }
+
+  if (albums.isEmpty) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Create an album first.',
+        ),
+      ),
+    );
+
+    return;
+  }
+
+  await showModalBottomSheet(
+    context: context,
+    backgroundColor:
+        FolktriColors.surface,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      return SafeArea(
+        child: Column(
+          mainAxisSize:
+              MainAxisSize.min,
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding:
+                  const EdgeInsets.fromLTRB(
+                20,
+                8,
+                20,
+                12,
+              ),
+              child: Text(
+                'Add to album',
+                style:
+                    GoogleFonts.poppins(
+                  color:
+                      FolktriColors
+                          .primaryText,
+                  fontSize: 18,
+                  fontWeight:
+                      FontWeight.w600,
+                ),
+              ),
+            ),
+
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount:
+                    albums.length,
+                itemBuilder:
+                    (context, index) {
+                  final album =
+                      albums[index];
+
+                  final albumId =
+                      album['id']
+                              ?.toString() ??
+                          '';
+
+                  final albumName =
+                      album['name']
+                              ?.toString() ??
+                          'Album';
+
+                  return ListTile(
+                    leading: const Icon(
+                      Icons
+                          .photo_album_outlined,
+                      color:
+                          FolktriColors
+                              .primaryIndigo,
+                    ),
+
+                    title: Text(
+                      albumName,
+                    ),
+
+                    onTap: () async {
+                      Navigator.of(
+                        sheetContext,
+                      ).pop();
+
+                      await addPhotoToAlbum(
+                        photoId:
+                            photoId,
+                        albumId:
+                            albumId,
+                        albumName:
+                            albumName,
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -312,39 +678,26 @@ class _AlbumPageState extends State<AlbumPage> {
               },
 
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment
-                        .start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   ClipRRect(
-                    borderRadius:
-                        BorderRadius
-                            .circular(
-                      14,
-                    ),
+                    borderRadius: BorderRadius.circular(14,),
                     child: Container(
                       width: 145,
                       height: 130,
-                      color:
-                          FolktriColors
-                              .lightLavender,
+                      color: FolktriColors.lightLavender,
                       child:
                           coverUrl.isEmpty
                               ? const Center(
                                   child: Icon(
-                                    Icons
-                                        .photo_album_outlined,
+                                    Icons.photo_album_outlined,
                                     size: 36,
-                                    color:
-                                        FolktriColors
-                                            .secondaryText,
+                                    color: FolktriColors.secondaryText,
                                   ),
                                 )
                               : Image.network(
                                   coverUrl,
-                                  fit:
-                                      BoxFit
-                                          .cover,
+                                  fit: BoxFit.cover,
                                   errorBuilder:
                                       (
                                     context,
@@ -354,11 +707,8 @@ class _AlbumPageState extends State<AlbumPage> {
                                     return const Center(
                                       child:
                                           Icon(
-                                        Icons
-                                            .broken_image_outlined,
-                                        color:
-                                            FolktriColors
-                                                .secondaryText,
+                                            Icons.broken_image_outlined,
+                                        color: FolktriColors.secondaryText,
                                       ),
                                     );
                                   },
@@ -566,51 +916,134 @@ class _AlbumPageState extends State<AlbumPage> {
                                 .trim() ??
                               '';
 
-                            return ClipRRect(
-                              borderRadius:
-                                  BorderRadius
-                                      .circular(
-                                3,
-                              ),
+                            return Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                GestureDetector(
+                                  onTap: () async {
+                                    final changed =
+                                      await context.push<bool>(
+                                        '/all-photos/view',
+                                        extra: {
+                                          'photos': photos,
+                                          'initialIndex': index,
+                                        },
+                                      );
+
+                                  if (changed == true && mounted) {
+                                    await loadPhotos();
+                                    await loadAlbums();
+                                  }
+                                },
+
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(3,),
                               child:
                                   Container(
-                                color:
-                                    FolktriColors
-                                        .lightLavender,
-                                child: photoUrl
-                                        .isEmpty
+                                color: FolktriColors.lightLavender,
+                                child: photoUrl.isEmpty
                                     ? const Center(
                                         child:
                                             Icon(
-                                          Icons
-                                              .broken_image_outlined,
-                                          color:
-                                              FolktriColors.secondaryText,
+                                          Icons.broken_image_outlined,
+                                          color: FolktriColors.secondaryText,
                                         ),
                                       )
                                     : Image.network(
                                         photoUrl,
-                                        fit:
-                                            BoxFit
-                                                .cover,
+                                        fit: BoxFit.cover,
                                         errorBuilder:
-                                            (
-                                          context,
-                                          error,
-                                          stackTrace,
-                                        ) {
+                                            (context, error, stackTrace,) {
                                           return const Center(
                                             child:
                                                 Icon(
-                                              Icons
-                                                  .broken_image_outlined,
-                                              color:
-                                                  FolktriColors.secondaryText,
+                                              Icons.broken_image_outlined,
+                                              color:FolktriColors.secondaryText,
                                             ),
                                           );
                                         },
                                       ),
-                              ),
+                                  ),
+                                ),
+                                ),
+
+                                Positioned(
+                                  top: 3,
+                                  right: 3,
+                                  child: PopupMenuButton<String>(
+                                    padding: EdgeInsets.zero,
+
+                                    icon: Container(
+                                      width: 28,
+                                      height: 28,
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.55,
+                                        ),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.more_vert_rounded,
+                                        color: Colors.white,
+                                        size: 19,
+                                      ),
+                                    ),
+
+                                  onSelected: (value) async {
+                                    if (value == 'album') {
+                                      await showAddToAlbumDialog(photo,);
+                                      return;
+                                }
+
+      if (value == 'delete') {
+        await deletePhoto(
+          photo,
+        );
+      }
+    },
+
+    itemBuilder: (context) {
+      return const [
+        PopupMenuItem<String>(
+          value: 'album',
+          child: Row(
+            children: [
+              Icon(
+                Icons
+                    .photo_album_outlined,
+                size: 20,
+              ),
+              SizedBox(width: 10),
+              Text(
+                'Add to album',
+              ),
+            ],
+          ),
+        ),
+
+        PopupMenuItem<String>(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(
+                Icons
+                    .delete_outline_rounded,
+                size: 20,
+                color: Colors.red,
+              ),
+              SizedBox(width: 10),
+              Text(
+                'Delete photo',
+              ),
+            ],
+          ),
+        ),
+      ];
+    },
+  ),
+),
+                                
+                              ],
                             );
                           },
                           childCount:
