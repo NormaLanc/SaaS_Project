@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../Website/website_navbar.dart';
 
 class DesktopLandingPage extends StatefulWidget {
   const DesktopLandingPage({super.key});
@@ -84,16 +85,20 @@ class _DesktopLandingPageState extends State<DesktopLandingPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 500,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+      body: Column(
+        children: [
+          const WebsiteNavbar(),
+            Expanded(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: 500,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
 
                 // LOGO
                 Image.asset(
@@ -209,30 +214,13 @@ class _DesktopLandingPageState extends State<DesktopLandingPage> {
                 ),
               ],
             ),
+
           ),
         ),
       ),
+      ),
+      ],
+    ),
     );
   }
 }
-// import 'package:flutter/material.dart';
-
-// class DesktopLandingPage extends StatelessWidget {
-//   const DesktopLandingPage({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       body: Column(
-//         children: [
-//           // WebNavigationBar(),
-//           // HeroSection(),
-//           // FeaturesSection(),
-//           // SecuritySection(),
-//           // PricingSection(),
-//           // FooterSection(),
-//         ],
-//       ),
-//     );
-//   }
-// }

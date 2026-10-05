@@ -38,6 +38,12 @@ import '../Pages/App/Album/create_album.dart';
 import '../Pages/App/Album/view_album.dart';
 import '../Pages/App/Album/album_photo_viewer.dart';
 
+//WEBSITE IMPORTS
+import '../Pages/Website/About/about_page.dart';
+import '../Pages/Website/Features/features_page.dart';
+import '../Pages/Website/Support/support_page.dart';
+import '../Pages/Website/Privacy Policy/policies_page.dart';
+
 final GoRouter appRouter = GoRouter(
   // initialLocation: kIsWeb ? '/' : '/welcome',
   // initialLocation: kIsWeb ? '/' : '/login',
@@ -56,6 +62,12 @@ final GoRouter appRouter = GoRouter(
 
     final isPublicPage =
         path == '/' ||
+        path == '/about' ||
+        path == '/features' ||
+        path == '/support' ||
+        path == 'policies' ||
+        path == '/privacy' ||
+        path == '/terms' ||
         path == '/splash' || 
         path == '/welcome' ||
         path == '/login' ||
@@ -425,6 +437,23 @@ GoRoute(
       initialIndex: initialIndex,
     );
   },
+),
+//--------------WEBSITE NAVIGATION-------------------
+GoRoute(
+  path: '/about',
+  builder: (context, state) => const AboutPage(),
+),
+GoRoute(
+  path: '/features',
+  builder: (context, state) => const FeaturesPage(),
+),
+GoRoute(
+  path: '/support',
+  builder: (context, state) => const SupportPage(),
+),
+GoRoute(
+  path: '/policies',
+  builder: (context, state) => const PoliciesPage(),
 ),
   ],
 );
