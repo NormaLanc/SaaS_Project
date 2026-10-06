@@ -65,7 +65,7 @@ final GoRouter appRouter = GoRouter(
         path == '/about' ||
         path == '/features' ||
         path == '/support' ||
-        path == 'policies' ||
+        path == '/policies' ||
         path == '/privacy' ||
         path == '/terms' ||
         path == '/splash' || 
